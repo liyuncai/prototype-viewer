@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>原型设计工具 - 专业版 v2</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * { font-family: 'Noto Sans SC', sans-serif; box-sizing: border-box; }
+    body { overflow: hidden; }
+    
+    /* 工具栏 */
+    .top-toolbar { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; }
+    .toolbar-group { display: flex; align-items: center; gap: 4px; }
+    .toolbar-btn { padding: 8px 12px; border-radius: 6px; color: #94a3b8; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; font-size: 13px; }
+    .toolbar-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+    .toolbar-btn.active { background: #3b82f6; color: white; }
+    .toolbar-divider { width: 1px; height: 24px; background: #334155; margin: 0 8px; }
+    
+    /* 组件面板 */
+    .components-panel { width: 220px; background: white; border-right: 1px solid #e2e8f0; overflow-y: auto; }
+    .panel-section { border-bottom: 1px solid #e2e8f0; }
+    .panel-header { padding: 12px; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .component-item { padding: 8px 12px; display: flex; align-items: center; gap: 10px; cursor: grab; transition: all 0.15s; font-size: 13px; color: #334155; }
+    .component-item:hover { background: #f1f5f9; }
+    .component-item:active { cursor: grabbing; }
+    .component-item i { width: 20px; text-align: center; color: #64748b; }
+    
+    /* 画布区域 */
+    .canvas-area { flex: 1; background: #f1f5f9; overflow: auto; position: relative; }
+    .canvas { width: 375px; min-height: 667px; background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.15); position: relative; margin: 40px auto; border-radius: 8px; overflow: hidden; }
+    .canvas.mobile { width: 375px; min-height: 667px; }
+    .canvas.tablet { width: 768px; min-height: 1024px; }
+    .canvas.desktop { width: 1280px; min-height: 800px; }
+    
+    /* 画布内的元素 */
+    .canvas-element { position: absolute; cursor: move; user-select: none; }
+    .canvas-element.selected { outline: 2px solid #3b82f6; }
+    .canvas-element:hover:not(.selected) { outline: 1px dashed #94a3b8; }
+    
+    /* 缩放手柄 */
+    .resize-handle { position: absolute; width: 10px; height: 10px; background: #3b82f6; border-radius: 2px; display: none; }
+    .canvas-element.selected .resize-handle { display: block; }
+    .resize-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
+    .resize-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
+    .resize-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+    .resize-handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
+    
+    /* 属性面板 */
+    .properties-panel { width: 280px; background: white; border-left: 1px solid #e2e8f0; overflow-y: auto; }
+    .property-group { padding: 12px; border-bottom: 1px solid #e2e8f0; }
+    .property-label { font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 6px; }
+    .property-input { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; }
+    .property-input:focus { outline: none; border-color: #3b82f6; }
+    .property-row { display: flex; gap: 8px; }
+    .property-row .property-input { flex: 1; }
+    
+    /* 组件样式 */
+    .comp-text { padding: 8px; min-width: 50px; min-height: 20px; }
+    .comp-button { padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .comp-input { padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: white; width: 100%; height: 100%; }
+    .comp-image { background: #f1f5f9; display: flex; align-items: center; justify-content: center; color: #94a3b8; overflow: hidden; }
+    .comp-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; width: 100%; height: 100%; }
+    .comp-navbar { background: white; border-bottom: 1px solid #e2e8f0; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; width: 100%; height: 100%; }
+    .comp-tabbar { background: white; border-top: 1px solid #e2e8f0; padding: 8px 0; display: flex; justify-content: space-around; width: 100%; height: 100%; }
+    .comp-tabbar-item { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; color: #94a3b8; cursor: pointer; }
+    .comp-tabbar-item.active { color: #3b82f6; }
+    .comp-list { padding: 8px; width: 100%; height: 100%; overflow: auto; }
+    .comp-list-item { padding: 12px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 12px; }
+    .comp-alert { padding: 12px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; color: #92400e; font-size: 13px; width: 100%; height: 100%; display: flex; align-items: center; }
+    .comp-badge { display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; }
+    .comp-avatar { border-radius: 50%; background: #e2e8f0; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .comp-progress { border-radius: 4px; overflow: hidden; width: 100%; }
+    .comp-checkbox { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .comp-radio { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .comp-switch { border-radius: 13px; cursor: pointer; position: relative; }
+    .comp-select { width: 100%; height: 100%; padding: 0 12px; border: 1px solid #d1d5db; border-radius: 6px; }
+    
+    /* 图片分割 */
+    .image-slicer { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.7); color: white; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; z-index: 100; }
+    .slice-preview { display: grid; gap: 2px; margin-top: 8px; }
+    .slice-preview img { width: 100%; height: auto; }
+    
+    /* 连线 */
+    .connector-line { position: absolute; pointer-events: none; z-index: 50; }
+    .connector-line line { stroke: #94a3b8; stroke-width: 2; stroke-dasharray: 5,5; }
+    .connector-line.active line { stroke: #3b82f6; stroke-dasharray: none; }
+    
+    /* 批注 */
+    .annotation-marker { position: absolute; width: 20px; height: 20px; background: #ef4444; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold; cursor: pointer; z-index: 1000; box-shadow: 0 2px 4px rgba(239,68,68,0.4); }
+    .annotation-card { position: absolute; background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); z-index: 1001; min-width: 180px; max-width: 250px; border-left: 4px solid #ef4444; font-size: 12px; }
+    .annotation-card .card-content { padding: 10px; }
+    .annotation-card textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; font-size: 12px; resize: vertical; min-height: 50px; font-family: inherit; }
+    
+    /* 图层 */
+    .layers-panel { width: 200px; background: white; border-right: 1px solid #e2e8f0; overflow-y: auto; }
+    .layer-item { padding: 8px 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+    .layer-item:hover { background: #f8fafc; }
+    .layer-item.selected { background: #eff6ff; }
+    .layer-item .layer-icon { width: 16px; color: #94a3b8; }
+    
+    /* 页面 */
+    .pages-panel { background: #1e293b; padding: 8px; display: flex; gap: 4px; overflow-x: auto; }
+    .page-tab { padding: 6px 16px; background: transparent; color: #94a3b8; border-radius: 6px; font-size: 13px; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+    .page-tab:hover { background: rgba(255,255,255,0.1); }
+    .page-tab.active { background: #3b82f6; color: white; }
+    
+    /* 分享弹窗 */
+    .share-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 10000; }
+    .share-modal.active { display: flex; }
+    .share-modal-content { background: white; border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; }
+    
+    /* 图片上传 */
+    .image-upload-zone { border: 2px dashed #d1d5db; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .image-upload-zone:hover { border-color: #3b82f6; background: #eff6ff; }
+    
+    /* 预览模式 */
+    .preview-mode .canvas-element { cursor: default; }
+    .preview-mode .canvas-element:hover { outline: none; }
+    .preview-mode .resize-handle { display: none !important; }
+  </style>
+</head>
+<body class="h-screen flex flex-col bg-gray-100">
+  <div id="app" class="flex flex-col h-full">
+    <!-- 顶部工具栏 -->
+    <div class="top-toolbar">
+      <div class="flex items-center gap-4">
+        <div class="text-white font-semibold text-lg">🎯 原型设计工具</div>
+        <div class="toolbar-divider"></div>
+        
+        <div class="toolbar-group">
+          <button class="toolbar-btn" onclick="setTool('select')" id="tool-select" title="选择工具 (V)">
+            <i class="fas fa-mouse-pointer"></i>
+          </button>
+          <button class="toolbar-btn" onclick="setTool('pan')" id="tool-pan" title="移动画布 (H)">
+            <i class="fas fa-hand-paper"></i>
+          </button>
+          <button class="toolbar-btn" onclick="setTool('comment')" id="tool-comment" title="添加批注 (C)">
+            <i class="fas fa-comment-dots"></i>
+          </button>
+          <button class="toolbar-btn" onclick="setTool('connector')" id="tool-connector" title="连线工具 (L)">
+            <i class="fas fa-long-arrow-alt-right"></i>
+          </button>
+        </div>
+        
+        <div class="toolbar-divider"></div>
+        
+        <div class="toolbar-group">
+          <button class="toolbar-btn" onclick="copyElement()" title="复制 (Ctrl+C)">
+            <i class="fas fa-copy"></i>
+          </button>
+          <button class="toolbar-btn" onclick="pasteElement()" title="粘贴 (Ctrl+V)">
+            <i class="fas fa-paste"></i>
+          </button>
+          <button class="toolbar-btn" onclick="deleteSelected()" title="删除 (Del)">
+            <i class="fas fa-trash"></i>
+          </button>
+        </div>
+        
+        <div class="toolbar-divider"></div>
+        
+        <div class="toolbar-group">
+          <button class="toolbar-btn" onclick="undo()" title="撤销 (Ctrl+Z)">
+            <i class="fas fa-undo"></i>
+          </button>
+          <button class="toolbar-btn" onclick="redo()" title="重做 (Ctrl+Y)">
+            <i class="fas fa-redo"></i>
+          </button>
+        </div>
+        
+        <div class="toolbar-divider"></div>
+        
+        <div class="toolbar-group">
+          <button class="toolbar-btn" onclick="setDevice('mobile')" id="device-mobile" title="手机 (375x667)">
+            <i class="fas fa-mobile-alt"></i>
+          </button>
+          <button class="toolbar-btn" onclick="setDevice('tablet')" id="device-tablet" title="平板 (768x1024)">
+            <i class="fas fa-tablet-alt"></i>
+          </button>
+          <button class="toolbar-btn" onclick="setDevice('desktop')" id="device-desktop" title="桌面 (1280x800)">
+            <i class="fas fa-desktop"></i>
+          </button>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <button class="toolbar-btn" onclick="toggleGrid()" title="显示网格 (G)">
+          <i class="fas fa-th"></i>
+        </button>
+        <button class="toolbar-btn" onclick="previewPrototype()" title="预览原型 (F5)">
+          <i class="fas fa-play"></i> 预览
+        </button>
+        <button class="toolbar-btn bg-green-600 hover:bg-green-700" onclick="showShareModal()" title="分享">
+          <i class="fas fa-share-alt"></i> 分享
+        </button>
+      </div>
+    </div>
+    
+    <!-- 页面导航 -->
+    <div class="pages-panel">
+      <button class="page-tab active" onclick="switchPage(0)">
+        <i class="fas fa-file-alt"></i> 页面 1
+      </button>
+      <button class="page-tab" onclick="addNewPage()">
+        <i class="fas fa-plus"></i>
+      </button>
+    </div>
+    
+    <!-- 主工作区 -->
+    <div class="flex flex-1 overflow-hidden">
+      <!-- 左侧组件面板 -->
+      <div class="components-panel">
+        <div class="panel-section">
+          <div class="panel-header">基础组件</div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'text')">
+            <i class="fas fa-font"></i> 文本
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'button')">
+            <i class="fas fa-square"></i> 按钮
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'input')">
+            <i class="fas fa-edit"></i> 输入框
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'image')">
+            <i class="fas fa-image"></i> 图片
+          </div>
+        </div>
+        
+        <div class="panel-section">
+          <div class="panel-header">布局组件</div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'card')">
+            <i class="far fa-square"></i> 卡片
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'navbar')">
+            <i class="fas fa-bars"></i> 导航栏
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'tabbar')">
+            <i class="fas fa-th-large"></i> 标签栏
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'list')">
+            <i class="fas fa-list"></i> 列表
+          </div>
+        </div>
+        
+        <div class="panel-section">
+          <div class="panel-header">表单组件</div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'checkbox')">
+            <i class="far fa-check-square"></i> 复选框
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'radio')">
+            <i class="far fa-circle"></i> 单选框
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'switch')">
+            <i class="fas fa-toggle-on"></i> 开关
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'select')">
+            <i class="fas fa-caret-square-down"></i> 下拉选择
+          </div>
+        </div>
+        
+        <div class="panel-section">
+          <div class="panel-header">显示组件</div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'alert')">
+            <i class="fas fa-exclamation-triangle"></i> 警告框
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'badge')">
+            <i class="fas fa-tag"></i> 标签
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'avatar')">
+            <i class="fas fa-user-circle"></i> 头像
+          </div>
+          <div class="component-item" draggable="true" ondragstart="dragStart(event, 'progress')">
+            <i class="fas fa-spinner"></i> 进度条
+          </div>
+        </div>
+        
+        <div class="panel-section">
+          <div class="panel-header">🖼️ 图片操作</div>
+          <div class="component-item" onclick="triggerImageUpload()">
+            <i class="fas fa-upload"></i> 上传图片
+          </div>
+          <div class="component-item" onclick="addImageSlicer()">
+            <i class="fas fa-cut"></i> 图片分割
+          </div>
+        </div>
+        
+        <input type="file" id="imageUpload" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+      </div>
+      
+      <!-- 图层面板 -->
+      <div class="layers-panel">
+        <div class="panel-header">🗂️ 图层</div>
+        <div id="layersList"></div>
+      </div>
+      
+      <!-- 画布区域 -->
+      <div class="canvas-area" id="canvasArea">
+        <div class="canvas mobile" id="canvas">
+          <!-- 画布内容 -->
+        </div>
+      </div>
+      
+      <!-- 右侧属性面板 -->
+      <div class="properties-panel">
+        <div class="panel-header">⚙️ 属性</div>
+        
+        <div id="propertiesContent">
+          <div class="p-4 text-center text-gray-400 text-sm">
+            选择一个元素查看属性
+          </div>
+        </div>
+        
+        <div class="property-group">
+          <div class="property-label">📝 批注</div>
+          <button class="toolbar-btn w-full justify-center mt-2" onclick="addAnnotationToSelected()">
+            <i class="fas fa-plus"></i> 添加批注
+          </button>
+        </div>
+        
+        <div class="property-group">
+          <div class="property-label">🔗 连线</div>
+          <button class="toolbar-btn w-full justify-center mt-2" onclick="connectToSelected()">
+            <i class="fas fa-link"></i> 连接元素
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分享弹窗 -->
+  <div class="share-modal" id="shareModal">
+    <div class="share-modal-content">
+      <h3 class="text-lg font-semibold mb-4">📤 分享原型</h3>
+      <p class="text-sm text-gray-600 mb-4">你可以将原型导出为HTML文件分享给开发同学，或者生成在线链接（需要上传到服务器）。</p>
+      
+      <div class="space-y-3">
+        <button onclick="exportToHTML()" class="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2">
+          <i class="fas fa-download"></i> 导出为HTML文件
+        </button>
+        <button onclick="generateShareLink()" class="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center justify-center gap-2">
+          <i class="fas fa-link"></i> 生成分享链接
+        </button>
+        <button onclick="closeShareModal()" class="w-full py-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+          关闭
+        </button>
+      </div>
+      
+      <div id="shareLinkResult" class="mt-4 hidden">
+        <p class="text-sm text-gray-600 mb-2">分享链接：</p>
+        <input type="text" id="shareLinkInput" class="w-full p-2 border rounded text-sm" readonly>
+        <button onclick="copyShareLink()" class="mt-2 text-blue-600 text-sm">复制链接</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图片分割弹窗 -->
+  <div class="share-modal" id="sliceModal">
+    <div class="share-modal-content">
+      <h3 class="text-lg font-semibold mb-4">✂️ 图片分割</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm text-gray-600">行数（垂直分割）</label>
+          <input type="number" id="sliceRows" class="property-input" value="2" min="1" max="10">
+        </div>
+        <div>
+          <label class="text-sm text-gray-600">列数（水平分割）</label>
+          <input type="number" id="sliceCols" class="property-input" value="2" min="1" max="10">
+        </div>
+        <div class="flex gap-2">
+          <button onclick="applyImageSlice()" class="flex-1 py-2 bg-blue-600 text-white rounded">应用分割</button>
+          <button onclick="closeSliceModal()" class="px-4 py-2 bg-gray-100 rounded">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 状态管理
+    let state = {
+      currentTool: 'select',
+      currentDevice: 'mobile',
+      currentPage: 0,
+      pages: [{ name: '页面 1', elements: [], annotations: [], connectors: [] }],
+      selectedElement: null,
+      isDragging: false,
+      isResizing: false,
+      resizeHandle: null,
+      dragOffset: { x: 0, y: 0 },
+      showGrid: false,
+      showRuler: false,
+      history: [],
+      historyIndex: -1,
+      clipboard: null,
+      connectorStart: null
+    };
+
+    // 默认组件属性
+    const defaultProps = {
+      text: { text: '文本内容', fontSize: 14, color: '#333333', fontWeight: 'normal', textAlign: 'left' },
+      button: { text: '按钮', backgroundColor: '#3b82f6', color: '#ffffff', borderRadius: 8 },
+      input: { placeholder: '请输入...', backgroundColor: '#ffffff', borderColor: '#d1d5db' },
+      image: { src: '', backgroundColor: '#f1f5f9', width: '100%', height: 100, isSliced: false, sliceRows: 1, sliceCols: 1 },
+      card: { backgroundColor: '#ffffff', borderRadius: 8, borderColor: '#e2e8f0', padding: 12 },
+      navbar: { title: '标题', backgroundColor: '#ffffff', borderColor: '#e2e8f0' },
+      tabbar: { items: ['首页', '消息', '我的'], activeIndex: 0 },
+      list: { items: ['选项 1', '选项 2', '选项 3'] },
+      checkbox: { label: '复选框', checked: false },
+      radio: { label: '单选框', checked: false },
+      switch: { checked: false },
+      select: { placeholder: '请选择', options: ['选项 1', '选项 2', '选项 3'] },
+      alert: { text: '提示信息', type: 'warning' },
+      badge: { text: '标签', backgroundColor: '#ef4444', color: '#ffffff' },
+      avatar: { src: '', size: 40 },
+      progress: { value: 50, backgroundColor: '#e2e8f0', barColor: '#3b82f6' }
+    };
+
+    // 初始化
+    function init() {
+      renderCanvas();
+      updateLayers();
+      saveHistory();
+    }
+
+    // 拖拽开始
+    function dragStart(event, type) {
+      event.dataTransfer.setData('componentType', type);
+    }
+
+    // 拖拽到画布
+    const canvasArea = document.getElementById('canvasArea');
+    canvasArea.addEventListener('dragover', (e) => { e.preventDefault(); canvasArea.classList.add('drag-over'); });
+    canvasArea.addEventListener('dragleave', () => { canvasArea.classList.remove('drag-over'); });
+    canvasArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      canvasArea.classList.remove('drag-over');
+      const type = e.dataTransfer.getData('componentType');
+      const canvas = document.getElementById('canvas');
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left - 50;
+      const y = e.clientY - rect.top - 20;
+      addElement(type, x, y);
+    });
+
+    // 添加元素
+    function addElement(type, x, y, props = null) {
+      const element = {
+        id: 'el_' + Date.now(),
+        type: type,
+        x: Math.max(0, x),
+        y: Math.max(0, y),
+        width: getDefaultWidth(type),
+        height: getDefaultHeight(type),
+        props: props || { ...defaultProps[type] },
+        annotations: []
+      };
+      
+      state.pages[state.currentPage].elements.push(element);
+      selectElement(element.id);
+      renderCanvas();
+      updateLayers();
+      saveHistory();
+    }
+
+    function getDefaultWidth(type) {
+      const widths = { text: 100, button: 100, input: 200, image: 150, card: 200, navbar: 320, tabbar: 320, list: 280, checkbox: 100, radio: 100, switch: 50, select: 150, alert: 280, badge: 50, avatar: 40, progress: 200 };
+      return widths[type] || 100;
+    }
+
+    function getDefaultHeight(type) {
+      const heights = { text: 20, button: 40, input: 40, image: 100, card: 100, navbar: 44, tabbar: 50, list: 120, checkbox: 24, radio: 24, switch: 30, select: 40, alert: 40, badge: 24, avatar: 40, progress: 8 };
+      return heights[type] || 40;
+    }
+
+    // 渲染画布
+    function renderCanvas() {
+      const canvas = document.getElementById('canvas');
+      const elements = state.pages[state.currentPage].elements;
+      const connectors = state.pages[state.currentPage].connectors || [];
+      
+      // 渲染连线
+      let connectorsHTML = '';
+      connectors.forEach((conn, i) => {
+        const fromEl = elements.find(e => e.id === conn.from);
+        const toEl = elements.find(e => e.id === conn.to);
+        if (fromEl && toEl) {
+          const x1 = fromEl.x + fromEl.width;
+          const y1 = fromEl.y + fromEl.height / 2;
+          const x2 = toEl.x;
+          const y2 = toEl.y + toEl.height / 2;
+          connectorsHTML += `<svg class="connector-line" style="left:0;top:0;width:100%;height:100%;"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/></svg>`;
+        }
+      });
+      
+      canvas.innerHTML = connectorsHTML + elements.map(el => renderElement(el)).join('');
+      
+      // 渲染批注
+      renderAnnotations();
+      
+      // 添加事件监听
+      elements.forEach(el => {
+        const domEl = document.getElementById(el.id);
+        if (domEl) {
+          domEl.addEventListener('mousedown', (e) => {
+            if (state.currentTool === 'select') {
+              startDrag(e, el.id);
+            } else if (state.currentTool === 'comment') {
+              addAnnotationById(el.id);
+            } else if (state.currentTool === 'connector') {
+              handleConnectorClick(el.id);
+            }
+          });
+        }
+      });
+    }
+
+    // 渲染元素
+    function renderElement(el) {
+      const props = el.props;
+      const isSelected = state.selectedElement === el.id;
+      const selectedClass = isSelected ? 'selected' : '';
+      
+      let content = '';
+      let style = `position: absolute; left: ${el.x}px; top: ${el.y}px; width: ${el.width}px; height: ${el.height}px;`;
+      
+      // 图片分割处理
+      let imageContent = '';
+      if (el.type === 'image' && props.isSliced && props.src) {
+        const rows = props.sliceRows || 1;
+        const cols = props.sliceCols || 1;
+        const sliceWidth = 100 / cols;
+        const sliceHeight = 100 / rows;
+        let slicesHTML = '';
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const bgX = -(c * 100 / (cols - 1 || 1)) + '%';
+            const bgY = -(r * 100 / (rows - 1 || 1)) + '%';
+            slicesHTML += `<div style="width:${sliceWidth}%;height:${sliceHeight}%;background:url(${props.src}) ${bgX} ${bgY}/${cols * 100}% ${rows * 100}% no-repeat;border:1px solid #e2e8f0;box-sizing:border-box;"></div>`;
+          }
+        }
+        imageContent = `<div style="width:100%;height:100%;display:flex;flex-wrap:wrap;">${slicesHTML}</div>`;
+      } else if (el.type === 'image') {
+        imageContent = props.src ? `<img src="${props.src}" style="width:100%;height:100%;object-fit:cover;">` : '<i class="fas fa-image fa-2x"></i>';
+      }
+      
+      switch(el.type) {
+        case 'text':
+          content = `<div class="comp-text" style="font-size: ${props.fontSize}px; color: ${props.color}; font-weight: ${props.fontWeight}; text-align: ${props.textAlign};">${props.text}</div>`;
+          break;
+        case 'button':
+          content = `<button class="comp-button" style="width: 100%; height: 100%; background: ${props.backgroundColor}; color: ${props.color}; border-radius: ${props.borderRadius}px; border: none; cursor: pointer;">${props.text}</button>`;
+          break;
+        case 'input':
+          content = `<input type="text" class="comp-input" placeholder="${props.placeholder}">`;
+          break;
+        case 'image':
+          content = `<div class="comp-image" style="width: 100%; height: 100%; background: ${props.backgroundColor};">${imageContent}</div>
+            ${props.isSliced ? '<div class="image-slicer" onclick="editImageSlice(\'' + el.id + '\')"><i class="fas fa-cut"></i></div>' : ''}`;
+          break;
+        case 'card':
+          content = `<div class="comp-card" style="background: ${props.backgroundColor}; border-radius: ${props.borderRadius}px; border: 1px solid ${props.borderColor}; padding: ${props.padding}px;"></div>`;
+          break;
+        case 'navbar':
+          content = `<div class="comp-navbar" style="background: ${props.backgroundColor}; border-bottom: 1px solid ${props.borderColor};">
+            <i class="fas fa-bars" style="color: #666;"></i>
+            <span style="font-weight: 600;">${props.title}</span>
+            <div style="width: 20px;"></div>
+          </div>`;
+          break;
+        case 'tabbar':
+          content = `<div class="comp-tabbar">
+            ${props.items.map((item, i) => `<div class="comp-tabbar-item ${i === props.activeIndex ? 'active' : ''}"><i class="fas ${getTabIcon(i)}"></i><span>${item}</span></div>`).join('')}
+          </div>`;
+          break;
+        case 'list':
+          content = `<div class="comp-list">
+            ${props.items.map(item => `<div class="comp-list-item"><div style="width: 40px; height: 40px; background: #e2e8f0; border-radius: 8px;"></div><div>${item}</div></div>`).join('')}
+          </div>`;
+          break;
+        case 'checkbox':
+          content = `<label class="comp-checkbox"><input type="checkbox" ${props.checked ? 'checked' : ''}><span>${props.label}</span></label>`;
+          break;
+        case 'radio':
+          content = `<label class="comp-radio"><input type="radio" ${props.checked ? 'checked' : ''}><span>${props.label}</span></label>`;
+          break;
+        case 'switch':
+          content = `<div class="comp-switch" style="width:${el.width}px;height:${el.height}px;background:${props.checked ? '#3b82f6' : '#e2e8f0'};">
+            <div style="width:${el.height - 4}px;height:${el.height - 4}px;background:white;border-radius:50%;position:absolute;top:2px;${props.checked ? 'right:2px' : 'left:2px'};box-shadow:0 2px 4px rgba(0,0,0,0.2);"></div>
+          </div>`;
+          break;
+        case 'select':
+          content = `<select class="comp-select"><option>${props.placeholder}</option>${props.options.map(opt => `<option>${opt}</option>`).join('')}</select>`;
+          break;
+        case 'alert':
+          content = `<div class="comp-alert"><i class="fas fa-exclamation-triangle" style="margin-right:8px;"></i>${props.text}</div>`;
+          break;
+        case 'badge':
+          content = `<span class="comp-badge" style="background:${props.backgroundColor};color:${props.color};">${props.text}</span>`;
+          break;
+        case 'avatar':
+          content = `<div class="comp-avatar" style="width:${props.size}px;height:${props.size}px;">
+            ${props.src ? `<img src="${props.src}" style="width:100%;height:100%;object-fit:cover;">` : '<i class="fas fa-user" style="font-size: 20px; color: #94a3b8;"></i>'}
+          </div>`;
+          break;
+        case 'progress':
+          content = `<div class="comp-progress" style="width:100%;height:${el.height}px;background:${props.backgroundColor};">
+            <div style="width:${props.value}%;height:100%;background:${props.barColor};"></div>
+          </div>`;
+          break;
+        default:
+          content = `<div>${el.type}</div>`;
+      }
+      
+      // 添加缩放手柄
+      const resizeHandles = isSelected ? `
+        <div class="resize-handle nw" data-handle="nw"></div>
+        <div class="resize-handle ne" data-handle="ne"></div>
+        <div class="resize-handle sw" data-handle="sw"></div>
+        <div class="resize-handle se" data-handle="se"></div>
+      ` : '';
+      
+      return `<div id="${el.id}" class="canvas-element ${selectedClass}" style="${style}">${content}${resizeHandles}</div>`;
+    }
+
+    function getTabIcon(index) { return ['fa-home', 'fa-comment', 'fa-user'][index] || 'fa-circle'; }
+
+    // 开始拖拽
+    function startDrag(e, elementId) {
+      e.preventDefault();
+      const element = state.pages[state.currentPage].elements.find(el => el.id === elementId);
+      if (!element) return;
+      
+      // 检查是否点击了缩放手柄
+      if (e.target.classList.contains('resize-handle')) {
+        startResize(e, elementId, e.target.dataset.handle);
+        return;
+      }
+      
+      state.selectedElement = elementId;
+      state.isDragging = true;
+      
+      const rect = document.getElementById(elementId).getBoundingClientRect();
+      state.dragOffset = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      
+      renderCanvas();
+      renderProperties();
+      updateLayers();
+      
+      document.addEventListener('mousemove', onDrag);
+      document.addEventListener('mouseup', stopDrag);
+    }
+
+    function onDrag(e) {
+      if (!state.isDragging || !state.selectedElement) return;
+      
+      const canvas = document.getElementById('canvas');
+      const rect = canvas.getBoundingClientRect();
+      const element = state.pages[state.currentPage].elements.find(el => el.id === state.selectedElement);
+      
+      if (element) {
+        element.x = Math.max(0, e.clientX - rect.left - state.dragOffset.x);
+        element.y = Math.max(0, e.clientY - rect.top - state.dragOffset.y);
+        renderCanvas();
+      }
+    }
+
+    // 开始调整大小
+    function startResize(e, elementId, handle) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      state.isResizing = true;
+      state.resizeHandle = handle;
+      state.selectedElement = elementId;
+      
+      const element = state.pages[state.currentPage].elements.find(el => el.id === elementId);
+      const rect = document.getElementById(elementId).getBoundingClientRect();
+      const canvas = document.getElementById('canvas');
+      const canvasRect = canvas.getBoundingClientRect();
+      
+      state.resizeStart = {
+        x: e.clientX,
+        y: e.clientY,
+        elX: element.x,
+        elY: element.y,
+        elWidth: element.width,
+        elHeight: element.height,
+        canvasLeft: canvasRect.left,
+        canvasTop: canvasRect.top
+      };
+      
+      renderCanvas();
+      renderProperties();
+      
+      document.addEventListener('mousemove', onResize);
+      document.addEventListener('mouseup', stopResize);
+    }
+
+    function onResize(e) {
+      if (!state.isResizing || !state.selectedElement) return;
+      
+      const element = state.pages[state.currentPage].elements.find(el => el.id === state.selectedElement);
+      const start = state.resizeStart;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      
+      switch(state.resizeHandle) {
+        case 'se':
+          element.width = Math.max(20, start.elWidth + dx);
+          element.height = Math.max(20, start.elHeight + dy);
+          break;
+        case 'sw':
+          element.width = Math.max(20, start.elWidth - dx);
+          element.height = Math.max(20, start.elHeight + dy);
+          element.x = start.elX + (start.elWidth - element.width);
+          break;
+        case 'ne':
+          element.width = Math.max(20, start.elWidth + dx);
+          element.height = Math.max(20, start.elHeight - dy);
+          element.y = start.elY + (start.elHeight - element.height);
+          break;
+        case 'nw':
+          element.width = Math.max(20, start.elWidth - dx);
+          element.height = Math.max(20, start.elHeight - dy);
+          element.x = start.elX + (start.elWidth - element.width);
+          element.y = start.elY + (start.elHeight - element.height);
+          break;
+      }
+      
+      renderCanvas();
+    }
+
+    function stopDrag() {
+      if (state.isDragging) { state.isDragging = false; saveHistory(); }
+      document.removeEventListener('mousemove', onDrag);
+      document.removeEventListener('mouseup', stopDrag);
+    }
+
+    function stopResize() {
+      if (state.isResizing) { state.isResizing = false; saveHistory(); }
+      document.removeEventListener('mousemove', onResize);
+      document.removeEventListener('mouseup', stopResize);
+    }
+
+    // 选择元素
+    function selectElement(elementId) {
+      state.selectedElement = elementId;
+      renderCanvas();
+      renderProperties();
+      updateLayers();
+    }
+
+    // 复制粘贴
+    function copyElement() {
+      if (!state.selectedElement) { alert('请先选择一个元素'); return; }
+      const element = state.pages[state.currentPage].elements.find(el => el.id === state.selectedElement);
+      state.clipboard = JSON.parse(JSON.stringify(element));
+      alert('已复制');
+    }
+
+    function pasteElement() {
+      if (!state.clipboard) { alert('没有可粘贴的内容'); return; }
+      const newElement = JSON.parse(JSON.stringify(state.clipboard));
+      newElement.id = 'el_' + Date.now();
+      newElement.x += 20;
+      newElement.y += 20;
+      state.pages[state.currentPage].elements.push(newElement);
+      selectElement(newElement.id);
+      renderCanvas();
+      updateLayers();
+      saveHistory();
+    }
+
+    function deleteSelected() {
+      if (!state.selectedElement) { alert('请先选择一个元素'); return; }
+      state.pages[state.currentPage].elements = state.pages[state.currentPage].elements.filter(el => el.id !== state.selectedElement);
+      state.selectedElement = null;
+      renderCanvas();
+      updateLayers();
+      saveHistory();
+    }
+
+    // 连线功能
+    function handleConnectorClick(elementId) {
+      if (!state.connectorStart) {
+        state.connectorStart = elementId;
+        alert('已选择起始元素，请点击目标元素');
+      } else if (state.connectorStart !== elementId) {
+        if (!state.pages[state.currentPage].connectors) state.pages[state.currentPage].connectors = [];
+        state.pages[state.currentPage].connectors.push({ from: state.connectorStart, to: elementId });
+        state.connectorStart = null;
+        renderCanvas();
+        saveHistory();
+        alert('连线已创建');
+      }
+    }
+
+    function connectToSelected() {
+      if (!state.selectedElement) { alert('请先选择一个元素作为起点'); return; }
+      state.connectorStart = state.selectedElement;
+      alert('请点击目标元素进行连接');
+    }
+
+    // 图片上传
+    function triggerImageUpload() { document.getElementById('imageUpload').click(); }
+    
+    function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const canvas = document.getElementById('canvas');
+        const rect = canvas.getBoundingClientRect();
+        addElement('image', rect.width/2 - 75, rect.height/2 - 50, {
+          src: e.target.result,
+          backgroundColor: '#f1f5f9',
+          width: '100%',
+          height: 150,
+          isSliced: false,
+          sliceRows: 1,
+          sliceCols: 1
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // 图片分割
+    let currentSliceElement = null;
+    
+    function addImageSlice() {
+      if (!state.selectedElement) { alert('请先选择一个图片元素'); return; }
+      const element = state.pages[state.currentPage].elements.find(el => el.id === state.selectedElement);
+      if (element.type !== 'image') { alert('请选择图片元素'); return; }
+      currentSliceElement = element.id;
+      document.getElementById('sliceModal').classList.add('active');
+    }
+
+    function editImageSlice(elementId) {
+      const element = state.pages[state.currentPage].elements.find(el => el.id === elementId);
+      if (!element || element.type !== 'image') return;
+      currentSliceElement = elementId;
+      document.getElementById('sliceRows').value = element.props.sliceRows || 2;
+      document.getElementById('sliceCols').value = element.props.sliceCols || 2;
+      document.getElementById('sliceModal').classList.add('active');
+    }
+
+    function applyImageSlice() {
+      if (!currentSliceElement) return;
+      const element = state.pages[state.currentPage].elements.find(el => el.id === currentSliceElement);
+      if (!element) return;
+      
+      const rows = parseInt(document.getElementById('sliceRows').value) || 2;
+      const cols = parseInt(document.getElementById('sliceCols').value) || 2;
+      
+      element.props.isSliced = true;
+      element.props.sliceRows = rows;
+      element.props.sliceCols = cols;
+      element.height = element.width * rows / cols;
+      
+      renderCanvas();
+      closeSliceModal();
+      saveHistory();
+    }
+
+    function closeSliceModal() {
+      document.getElementById('sliceModal').classList.remove('active');
+      currentSliceElement = null;
+    }
+
+    // 批注功能
+    function renderAnnotations() {
+      const canvas = document.getElementById('canvas');
+      const annotations = state.pages[state.currentPage].annotations;
+      
+      annotations.forEach((ann, index) => {
+        const element = state.pages[state.currentPage].elements.find(el => el.id === ann.elementId);
+        if (!element) return;
+        
+        const marker = document.createElement('div');
+        marker.className = 'annotation-marker';
+        marker.style.left = (element.x + element.width - 10) + 'px';
+        marker.style.top = (element.y - 10) + 'px';
+        marker.innerHTML = index + 1;
+        marker.onclick = () => toggleAnnotationCard(index);
+        canvas.appendChild(marker);
+        
+        const card = document.createElement('div');
+        card.className = 'annotation-card';
+        card.id = 'card-' + index;
+        card.style.left = (element.x + element.width + 10) + 'px';
+        card.style.top = element.y + 'px';
+        card.innerHTML = `
+          <div class="card-content">
+            <div style="font-weight: 600; margin-bottom: 6px; color: #ef4444;">批注 ${index + 1}</div>
+            <textarea onchange="updateAnnotation(${index}, this.value)">${ann.text}</textarea>
+            <button onclick="deleteAnnotation(${index})" style="margin-top: 8px; color: #ef4444; font-size: 12px; background: none; border: none; cursor: pointer;">
+              <i class="fas fa-trash"></i> 删除
+            </button>
+          </div>
+        `;
+        canvas.appendChild(card);
+      });
+    }
+
+    function toggleAnnotationCard(index) {
+      const card = document.getElementById('card-' + index);
+      if (card) card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function addAnnotationToSelected() {
+      if (!state.selectedElement) { alert('请先选择一个元素'); return; }
+      addAnnotationById(state.selectedElement);
+    }
+
+    function addAnnotationById(elementId) {
+      const text = prompt('请输入批注内容:');
+      if (text) {
+        state.pages[state.currentPage].annotations.push({ elementId: elementId, text: text });
+        renderCanvas();
+        saveHistory();
+      }
+    }
+
+    function updateAnnotation(index, text) {
+      state.pages[state.currentPage].annotations[index].text = text;
+    }
+
+    function deleteAnnotation(index) {
+      state.pages[state.currentPage].annotations.splice(index, 1);
+      renderCanvas();
+    }
+
+    // 属性面板
+    function renderProperties() {
+      const content = document.getElementById('propertiesContent');
+      const element = state.pages[state.currentPage].elements.find(el => el.id === state.selectedElement);
+      
+      if (!element) {
+        content.innerHTML = `<div class="p-4 text-center text-gray-400 text-sm">选择一个元素查看属性</div>`;
+        return;
+      }
+      
+      let propsHTML = `
+        <div class="property-group">
+          <div class="property-label">位置</div>
+          <div class="property-row">
+            <input type="number" class="property-input" value="${Math.round(element.x)}" onchange="updateElementProp('x', parseInt(this.value))" placeholder="X">
+            <input type="number" class="property-input" value="${Math.round(element.y)}" onchange="updateElementProp('y', parseInt(this.value))" placeholder="Y">
+          </div>
+        </div>
+        <div class="property-group">
+          <div class="property-label">尺寸</div>
+          <div class="property-row">
+            <input type="number" class="property-input" value="${element.width}" onchange="updateElementProp('width', parseInt(this.value))" placeholder="宽">
+            <input type="number" class="property-input" value="${element.height}" onchange="updateElementProp('height', parseInt(this.value))" placeholder="高">
+          </div>
+        </div>
+      `;
+      
+      const props = element.props;
+      switch(element.type) {
+        case 'text':
+          propsHTML += `
+            <div class="property-group"><div class="property-label">文本</div><input type="text" class="property-input" value="${props.text}" onchange="updateElementProp('props.text', this.value)"></div>
+            <div class="property-group"><div class="property-label">字号</div><input type="number" class="property-input" value="${props.fontSize}" onchange="updateElementProp('props.fontSize', parseInt(this.value))"></div>
+            <div class="property-group"><div class="property-label">颜色</div><input type="color" class="property-input" value="${props.color}" onchange="updateElementProp('props.color', this.value)"></div>
+          `;
+          break;
+        case 'button':
+          propsHTML += `
+            <div class="property-group"><div class="property-label">文字</div><input type="text" class="property-input" value="${props.text}" onchange="updateElementProp('props.text', this.value)"></div>
+            <div class="property-group"><div class="property-label">背景</div><input type="color" class="property-input" value="${props.backgroundColor}" onchange="updateElementProp('props.backgroundColor', this.value)"></div>
+            <div class="property-group"><div class="property-label">圆角</div><input type="number" class="property-input" value="${props.borderRadius}" onchange="updateElementProp('props.borderRadius', parseInt(this.value))"></div>
+          `;
+          break;
+        case 'input':
+          propsHTML += `<div class="property-group"><div class="property-label">占位符</div><input type="text" class="property-input" value="${props.placeholder}" onchange="updateElementProp('props.placeholder', this.value)"></div>`;
+          break;
+        case 'image':
+          propsHTML += `<div class="property-group"><div class="property-label">图片URL</div><input type="text" class="property-input" value="${props.src}" onchange="updateElementProp('props.src', this.value)"></div>`;
+          break;
+        case 'navbar':
+          propsHTML += `<div class="property-group"><div class="property-label">标题</div><input type="text" class="property-input" value="${props.title}" onchange="updateElementProp('props.title', this.value)"></div>`;
+          break;
+        case 'alert':
+          propsHTML += `<div class="property-group"><div class="property-label">提示文字</div><input type="text" class="property-input" value="${props.text}" onchange="updateElementProp('props.text', this.value)"></div>`;
+          break;
+      }
+      
+      content.innerHTML = propsHTML;
+    }
+
+    function updateElementProp(path, value) {
+      const element = state.pages[state.currentPage].elements.find(el => el.id === state.selectedElement);
+      if (!element) return;
+      
+      const keys = path.split('.');
+      let obj = element;
+      for (let i = 0; i < keys.length - 1; i++) obj = obj[keys[i]];
+      obj[keys[keys.length - 1]] = value;
+      
+      renderCanvas();
+      saveHistory();
+    }
+
+    // 图层
+    function updateLayers() {
+      const layersList = document.getElementById('layersList');
+      const elements = state.pages[state.currentPage].elements;
+      
+      layersList.innerHTML = elements.slice().reverse().map(el => {
+        const isSelected = state.selectedElement === el.id;
+        return `<div class="layer-item ${isSelected ? 'selected' : ''}" onclick="selectElement('${el.id}')">
+          <i class="fas ${getLayerIcon(el.type)} layer-icon"></i>
+          <span>${getLayerName(el)}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function getLayerIcon(type) {
+      const icons = { text: 'fa-font', button: 'fa-square', input: 'fa-edit', image: 'fa-image', card: 'fa-square', navbar: 'fa-bars', tabbar: 'fa-th-large', list: 'fa-list', checkbox: 'fa-check-square', radio: 'fa-circle', switch: 'fa-toggle-on', select: 'fa-caret-square-down', alert: 'fa-exclamation-triangle', badge: 'fa-tag', avatar: 'fa-user-circle', progress: 'fa-spinner' };
+      return icons[type] || 'fa-square';
+    }
+
+    function getLayerName(el) {
+      if (el.props && el.props.text) return el.props.text.substring(0, 15);
+      if (el.props && el.props.title) return el.props.title;
+      return el.type;
+    }
+
+    // 工具
+    function setTool(tool) {
+      state.currentTool = tool;
+      state.connectorStart = null;
+      document.querySelectorAll('.toolbar-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('tool-' + tool)?.classList.add('active');
+    }
+
+    function setDevice(device) {
+      state.currentDevice = device;
+      const canvas = document.getElementById('canvas');
+      canvas.className = 'canvas ' + device;
+      document.querySelectorAll('[id^="device-"]').forEach(btn => btn.classList.remove('active'));
+      document.getElementById('device-' + device)?.classList.add('active');
+    }
+
+    function toggleGrid() { state.showGrid = !state.showGrid; }
+
+    // 页面
+    function switchPage(index) {
+      state.currentPage = index;
+      state.selectedElement = null;
+      document.querySelectorAll('.page-tab').forEach((tab, i) => { tab.classList.toggle('active', i === index); });
+      renderCanvas();
+      updateLayers();
+      renderProperties();
+    }
+
+    function addNewPage() {
+      const name = prompt('请输入页面名称:', '页面 ' + (state.pages.length + 1));
+      if (name) {
+        state.pages.push({ name: name, elements: [], annotations: [], connectors: [] });
+        const pagesPanel = document.querySelector('.pages-panel');
+        const newTab = document.createElement('button');
+        newTab.className = 'page-tab';
+        newTab.innerHTML = `<i class="fas fa-file-alt"></i> ${name}`;
+        newTab.onclick = () => switchPage(state.pages.length - 1);
+        pagesPanel.insertBefore(newTab, pagesPanel.lastElementChild);
+        switchPage(state.pages.length - 1);
+      }
+    }
+
+    // 预览
+    function previewPrototype() { alert('预览功能：将打开新窗口展示可交互原型'); }
+
+    // 分享
+    function showShareModal() { document.getElementById('shareModal').classList.add('active'); }
+    function closeShareModal() { document.getElementById('shareModal').classList.remove('active'); document.getElementById('shareLinkResult').classList.add('hidden'); }
+    
+    function exportToHTML() {
+      const html = document.documentElement.outerHTML;
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'prototype-design.html';
+      a.click();
+      URL.revokeObjectURL(url);
+      closeShareModal();
+    }
+    
+    function generateShareLink() {
+      // 由于没有服务器，这里生成一个数据URL作为演示
+      const html = document.documentElement.outerHTML;
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      
+      document.getElementById('shareLinkInput').value = url;
+      document.getElementById('shareLinkResult').classList.remove('hidden');
+    }
+    
+    function copyShareLink() {
+      const input = document.getElementById('shareLinkInput');
+      input.select();
+      document.execCommand('copy');
+      alert('链接已复制');
+    }
+
+    // 历史
+    function saveHistory() {
+      state.history = state.history.slice(0, state.historyIndex + 1);
+      state.history.push(JSON.stringify(state.pages));
+      state.historyIndex++;
+    }
+
+    function undo() {
+      if (state.historyIndex > 0) {
+        state.historyIndex--;
+        state.pages = JSON.parse(state.history[state.historyIndex]);
+        renderCanvas();
+        updateLayers();
+      }
+    }
+
+    function redo() {
+      if (state.historyIndex < state.history.length - 1) {
+        state.historyIndex++;
+        state.pages = JSON.parse(state.history[state.historyIndex]);
+        renderCanvas();
+        updateLayers();
+      }
+    }
+
+    // 快捷键
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.key === 'c') copyElement();
+      if (e.ctrlKey && e.key === 'v') pasteElement();
+      if (e.key === 'Delete') deleteSelected();
+      if (e.ctrlKey && e.key === 'z') undo();
+      if (e.ctrlKey && e.key === 'y') redo();
+      if (e.key === 'v') setTool('select');
+      if (e.key === 'h') setTool('pan');
+      if (e.key === 'c') setTool('comment');
+      if (e.key === 'l') setTool('connector');
+      if (e.key === 'g') toggleGrid();
+    });
+
+    init();
+  </script>
+</body>
+</html>

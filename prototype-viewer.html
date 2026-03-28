@@ -2625,14 +2625,14 @@
                 
                 document.getElementById('axureFrame').style.display = 'none';
             } else {
-                // 图片模式
+                // 图片模式（包括 cloud 类型，截图存在 screenshot 字段）
                 let img = document.getElementById('canvasImage');
                 if (!img) {
                     img = document.createElement('img');
                     img.id = 'canvasImage';
                     canvasContainer.insertBefore(img, annotationsLayer);
                 }
-                img.src = page.image;
+                img.src = page.image || page.screenshot || '';
                 img.style.display = 'block';
                 axureFrame.style.display = 'none';
                 
@@ -4457,9 +4457,25 @@ ${JSON.stringify(packageData, null, 2)}
                 saveToStorage();
 
                 // 切换到上传模式展示截图
+                currentMode = 'upload';
                 switchMode('upload');
-                renderThumbnails();
-                renderAnnotationsList();
+
+                // 显示加载提示
+                if (pages.length > 0) {
+                    emptyState.style.display = 'none';
+                    canvasContainer.style.display = 'block';
+                    canvasContainer.classList.remove('axure-fullscreen');
+                    renderThumbnails();
+                    renderAnnotationsList();
+                    switchToPage(0);
+                }
+
+                // 更新标题
+                const headerTitle = document.querySelector('.header-title');
+                if (headerTitle && proj.name) {
+                    headerTitle.textContent = proj.name + ' (云端)';
+                }
+
                 enableCloudSync();
 
                 console.log('云项目加载完成:', proj.name, '页面:', pages.length, '批注:', annos?.length || 0);
@@ -4584,6 +4600,7 @@ ${JSON.stringify(packageData, null, 2)}
 
         // 初始化
         init();
+        checkCloudUrlParam();
         checkCloudProject();
     </script>
 </body>

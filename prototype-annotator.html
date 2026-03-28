@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>原型设计工具 - 带可视化批注</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Noto Sans SC', sans-serif; }
+    
+    /* 拖拽区域样式 */
+    .prototype-area {
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+      min-height: 600px;
+      position: relative;
+    }
+    
+    /* 可标注元素 */
+    .annotatable {
+      position: relative;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .annotatable:hover {
+      outline: 2px dashed #3b82f6;
+      outline-offset: 2px;
+    }
+    
+    .annotatable.selected {
+      outline: 2px solid #3b82f6;
+      outline-offset: 2px;
+    }
+    
+    /* 批注标记 */
+    .annotation-marker {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      background: #ef4444;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+      transition: transform 0.2s ease;
+    }
+    
+    .annotation-marker:hover {
+      transform: scale(1.2);
+    }
+    
+    /* 批注连线 */
+    .annotation-line {
+      position: absolute;
+      background: #ef4444;
+      z-index: 99;
+      pointer-events: none;
+    }
+    
+    /* 批注卡片 */
+    .annotation-card {
+      position: absolute;
+      background: white;
+      border-radius: 8px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      z-index: 101;
+      min-width: 200px;
+      max-width: 300px;
+      border-left: 4px solid #ef4444;
+    }
+    
+    .annotation-card .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .annotation-card .card-number {
+      background: #ef4444;
+      color: white;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    
+    .annotation-card textarea {
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 8px;
+      font-size: 13px;
+      resize: vertical;
+      min-height: 60px;
+    }
+    
+    .annotation-card textarea:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+    
+    .annotation-card .card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    
+    /* 颜色选择器 */
+    .color-picker-panel {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    
+    .color-option {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s;
+      border: 2px solid transparent;
+    }
+    
+    .color-option:hover {
+      transform: scale(1.1);
+    }
+    
+    .color-option.active {
+      border-color: #1f2937;
+    }
+    
+    /* 工具栏 */
+    .toolbar {
+      background: white;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 12px 20px;
+    }
+    
+    .toolbar-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .toolbar-btn:hover {
+      background: #f3f4f6;
+    }
+    
+    .toolbar-btn.active {
+      background: #eff6ff;
+      color: #3b82f6;
+    }
+    
+    /* 页面缩略图 */
+    .page-thumbnail {
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .page-thumbnail:hover {
+      border-color: #3b82f6;
+    }
+    
+    .page-thumbnail.active {
+      border-color: #3b82f6;
+      background: #eff6ff;
+    }
+    
+    /* 侧边栏 */
+    .sidebar {
+      width: 280px;
+      background: white;
+      border-right: 1px solid #e5e7eb;
+    }
+    
+    /* 示例UI组件 */
+    .demo-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      overflow: hidden;
+    }
+    
+    .demo-btn {
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+    }
+    
+    .demo-btn-primary {
+      background: #3b82f6;
+      color: white;
+    }
+    
+    .demo-btn-primary:hover {
+      background: #2563eb;
+    }
+    
+    .demo-btn-secondary {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    
+    .demo-btn-secondary:hover {
+      background: #e5e7eb;
+    }
+    
+    .demo-input {
+      padding: 10px 14px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      width: 100%;
+    }
+    
+    .demo-input:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    /* 动画 */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .annotation-card {
+      animation: fadeIn 0.2s ease;
+    }
+    
+    /* 预览模式 */
+    .preview-mode .annotatable:hover {
+      outline: none;
+    }
+    
+    .preview-mode .annotation-marker {
+      background: #10b981;
+    }
+    
+    .preview-mode .annotation-card {
+      border-left-color: #10b981;
+    }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div id="app" class="h-screen flex flex-col">
+    <!-- 顶部工具栏 -->
+    <div class="toolbar flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <h1 class="text-lg font-semibold text-gray-800">🎨 原型设计工具</h1>
+        <div class="h-6 w-px bg-gray-300"></div>
+        <button onclick="setMode('edit')" id="editBtn" class="toolbar-btn active">
+          <span>✏️</span> 编辑模式
+        </button>
+        <button onclick="setMode('preview')" id="previewBtn" class="toolbar-btn">
+          <span>👁️</span> 预览模式
+        </button>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="exportToHTML()" class="toolbar-btn bg-blue-50 text-blue-600">
+          <span>📤</span> 导出HTML
+        </button>
+        <button onclick="printPrototype()" class="toolbar-btn bg-green-50 text-green-600">
+          <span>🖨️</span> 打印/分享
+        </button>
+      </div>
+    </div>
+
+    <div class="flex flex-1 overflow-hidden">
+      <!-- 左侧页面导航 -->
+      <div class="sidebar p-4 overflow-y-auto">
+        <h3 class="text-sm font-semibold text-gray-600 mb-3">📄 页面列表</h3>
+        <div id="pageList" class="space-y-2">
+          <!-- 页面缩略图会在这里生成 -->
+        </div>
+        <button onclick="addNewPage()" class="w-full mt-4 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-500 transition">
+          + 添加新页面
+        </button>
+      </div>
+
+      <!-- 中间原型区域 -->
+      <div class="flex-1 overflow-auto p-6">
+        <div id="prototypeContainer" class="prototype-area rounded-xl shadow-lg p-8">
+          <!-- 原型内容会在这里 -->
+        </div>
+      </div>
+
+      <!-- 右侧属性面板 -->
+      <div class="w-72 bg-white border-l border-gray-200 p-4 overflow-y-auto">
+        <!-- 批注列表 -->
+        <div id="annotationPanel">
+          <h3 class="text-sm font-semibold text-gray-600 mb-3">📝 批注列表</h3>
+          <div id="annotationList" class="space-y-3">
+            <!-- 批注列表会在这里生成 -->
+          </div>
+          <p id="noAnnotationText" class="text-sm text-gray-400 text-center py-4">
+            点击页面元素添加批注
+          </p>
+        </div>
+
+        <div class="h-px bg-gray-200 my-4"></div>
+
+        <!-- 颜色主题 -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-600 mb-3">🎨 主题颜色</h3>
+          <div id="colorPicker" class="grid grid-cols-5 gap-2">
+            <!-- 颜色选项 -->
+          </div>
+        </div>
+
+        <div class="h-px bg-gray-200 my-4"></div>
+
+        <!-- 快捷操作 -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-600 mb-3">⚡ 快捷操作</h3>
+          <div class="space-y-2">
+            <button onclick="clearAllAnnotations()" class="w-full py-2 px-3 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 transition">
+              🗑️ 清除所有批注
+            </button>
+            <button onclick="toggleAllAnnotations()" class="w-full py-2 px-3 bg-gray-50 text-gray-600 rounded-lg text-sm hover:bg-gray-100 transition">
+              👁️ 显示/隐藏批注
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 状态管理
+    let state = {
+      mode: 'edit', // edit | preview
+      currentPage: 0,
+      pages: [
+        {
+          name: '收银台',
+          annotations: [],
+          themeColor: '#3b82f6'
+        },
+        {
+          name: '商品管理',
+          annotations: [],
+          themeColor: '#8b5cf6'
+        }
+      ],
+      selectedElement: null,
+      showAnnotations: true
+    };
+
+    // 颜色选项
+    const colors = [
+      '#3b82f6', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b',
+      '#10b981', '#06b6d4', '#6366f1', '#84cc16', '#6b7280'
+    ];
+
+    // 示例原型数据
+    const samplePrototypes = [
+      // 收银台页面
+      {
+        elements: [
+          { type: 'header', content: '🏪 收银台 - 多件商品条码', class: 'text-2xl font-bold mb-6' },
+          { type: 'card', class: 'demo-card p-4 mb-4', children: [
+            { type: 'text', content: '📋 当前商品列表', class: 'font-semibold mb-3' },
+            { type: 'table', class: 'w-full text-sm', children: [
+              { type: 'tr', children: [
+                { type: 'th', content: '商品条码' },
+                { type: 'th', content: '商品名称' },
+                { type: 'th', content: '数量' },
+                { type: 'th', content: '单价' }
+              ]},
+              { type: 'tr', children: [
+                { type: 'td', content: '6920202888888' },
+                { type: 'td', content: '农夫山泉550ml' },
+                { type: 'td', content: '2' },
+                { type: 'td', content: '¥2.00' }
+              ]},
+              { type: 'tr', children: [
+                { type: 'td', content: '6920202999999' },
+                { type: 'td', content: '可口可乐330ml' },
+                { type: 'td', content: '3' },
+                { type: 'td', content: '¥3.00' }
+              ]}
+            ]}
+          ]},
+          { type: 'alert', content: '⚠️ 提示：检测到多条相同条码，请确认是否重复扫描？', class: 'bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg mb-4' },
+          { type: 'button', content: '确认结算', class: 'demo-btn demo-btn-primary w-full mb-3', id: 'checkoutBtn' },
+          { type: 'button', content: '取消', class: 'demo-btn demo-btn-secondary w-full', id: 'cancelBtn' }
+        ]
+      },
+      // 商品管理页面
+      {
+        elements: [
+          { type: 'header', content: '📦 商品管理', class: 'text-2xl font-bold mb-6' },
+          { type: 'search', placeholder: '搜索商品名称/条码...', class: 'demo-input mb-4', id: 'searchInput' },
+          { type: 'grid', class: 'grid grid-cols-3 gap-4', children: [
+            { type: 'card', class: 'demo-card p-4', children: [
+              { type: 'image', class: 'h-24 bg-gray-200 rounded mb-3 flex items-center justify-center text-gray-400', content: '📷' },
+              { type: 'text', content: '农夫山泉', class: 'font-medium' },
+              { type: 'text', content: '¥2.00', class: 'text-green-600 text-sm' }
+            ]},
+            { type: 'card', class: 'demo-card p-4', children: [
+              { type: 'image', class: 'h-24 bg-gray-200 rounded mb-3 flex items-center justify-center text-gray-400', content: '📷' },
+              { type: 'text', content: '可口可乐', class: 'font-medium' },
+              { type: 'text', content: '¥3.00', class: 'text-green-600 text-sm' }
+            ]},
+            { type: 'card', class: 'demo-card p-4', children: [
+              { type: 'image', class: 'h-24 bg-gray-200 rounded mb-3 flex items-center justify-center text-gray-400', content: '📷' },
+              { type: 'text', content: '乐事薯片', class: 'font-medium' },
+              { type: 'text', content: '¥6.00', class: 'text-green-600 text-sm' }
+            ]}
+          ]}
+        ]
+      }
+    ];
+
+    // 初始化
+    function init() {
+      renderPageList();
+      renderColorPicker();
+      renderCurrentPage();
+    }
+
+    // 渲染页面列表
+    function renderPageList() {
+      const pageList = document.getElementById('pageList');
+      pageList.innerHTML = state.pages.map((page, index) => `
+        <div class="page-thumbnail ${index === state.currentPage ? 'active' : ''}" onclick="switchPage(${index})">
+          <div class="text-sm font-medium">${page.name}</div>
+          <div class="text-xs text-gray-400">${page.annotations.length} 个批注</div>
+        </div>
+      `).join('');
+    }
+
+    // 渲染颜色选择器
+    function renderColorPicker() {
+      const colorPicker = document.getElementById('colorPicker');
+      colorPicker.innerHTML = colors.map(color => `
+        <div class="color-option ${state.pages[state.currentPage].themeColor === color ? 'active' : ''}" 
+             style="background: ${color}" 
+             onclick="setThemeColor('${color}')"></div>
+      `).join('');
+    }
+
+    // 切换页面
+    function switchPage(index) {
+      state.currentPage = index;
+      renderPageList();
+      renderColorPicker();
+      renderCurrentPage();
+      renderAnnotationList();
+    }
+
+    // 添加新页面
+    function addNewPage() {
+      const name = prompt('请输入页面名称:', '新页面');
+      if (name) {
+        state.pages.push({
+          name: name,
+          annotations: [],
+          themeColor: colors[Math.floor(Math.random() * colors.length)]
+        });
+        state.currentPage = state.pages.length - 1;
+        renderPageList();
+        renderColorPicker();
+        renderCurrentPage();
+      }
+    }
+
+    // 设置主题颜色
+    function setThemeColor(color) {
+      state.pages[state.currentPage].themeColor = color;
+      renderColorPicker();
+      renderCurrentPage();
+    }
+
+    // 渲染当前页面
+    function renderCurrentPage() {
+      const container = document.getElementById('prototypeContainer');
+      const prototype = samplePrototypes[state.currentPage];
+      const themeColor = state.pages[state.currentPage].themeColor;
+      
+      container.innerHTML = renderElements(prototype.elements, 0);
+      
+      // 渲染批注标记
+      if (state.showAnnotations) {
+        renderAnnotations();
+      }
+      
+      // 更新主题色
+      document.querySelectorAll('.demo-btn-primary').forEach(btn => {
+        btn.style.background = themeColor;
+      });
+    }
+
+    // 渲染元素
+    function renderElements(elements, level) {
+      return elements.map((el, index) => {
+        const id = el.id || `el-${level}-${index}`;
+        const annotationClass = state.mode === 'edit' ? 'annotatable' : '';
+        
+        let html = '';
+        switch(el.type) {
+          case 'header':
+            html = `<h2 class="${el.class}">${el.content}</h2>`;
+            break;
+          case 'card':
+            html = `<div class="${el.class} ${annotationClass}" data-element-id="${id}">
+              ${el.children ? renderElements(el.children, level + 1) : ''}
+            </div>`;
+            break;
+          case 'text':
+            html = `<div class="${el.class}">${el.content}</div>`;
+            break;
+          case 'button':
+            html = `<button class="${el.class} ${annotationClass}" data-element-id="${id}">${el.content}</button>`;
+            break;
+          case 'input':
+          case 'search':
+            html = `<input type="text" class="${el.class} ${annotationClass}" data-element-id="${id}" placeholder="${el.placeholder || ''}">`;
+            break;
+          case 'table':
+            html = `<table class="${el.class}"><tbody>${el.children.map(tr => 
+              `<tr>${tr.children.map(cell => 
+                `<${cell.type}>${cell.content}</${cell.type}>`
+              ).join('')}</tr>`
+            ).join('')}</tbody></table>`;
+            break;
+          case 'alert':
+            html = `<div class="${el.class} ${annotationClass}" data-element-id="${id}">${el.content}</div>`;
+            break;
+          case 'grid':
+            html = `<div class="${el.class}">${el.children ? renderElements(el.children, level + 1) : ''}</div>`;
+            break;
+          case 'image':
+            html = `<div class="${el.class}">${el.content}</div>`;
+            break;
+        }
+        return html;
+      }).join('');
+    }
+
+    // 渲染批注
+    function renderAnnotations() {
+      const container = document.getElementById('prototypeContainer');
+      const annotations = state.pages[state.currentPage].annotations;
+      
+      annotations.forEach((ann, index) => {
+        const element = container.querySelector(`[data-element-id="${ann.elementId}"]`);
+        if (!element) return;
+        
+        const rect = element.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        // 计算元素在容器内的位置
+        const x = rect.left - containerRect.left + rect.width / 2;
+        const y = rect.top - containerRect.top - 10;
+        
+        // 批注标记
+        const marker = document.createElement('div');
+        marker.className = 'annotation-marker';
+        marker.style.left = `${x - 12}px`;
+        marker.style.top = `${y - 24}px`;
+        marker.innerHTML = index + 1;
+        marker.onclick = (e) => {
+          e.stopPropagation();
+          toggleAnnotationCard(index);
+        };
+        container.appendChild(marker);
+        
+        // 批注卡片
+        const card = document.createElement('div');
+        card.className = 'annotation-card';
+        card.id = `card-${index}`;
+        card.style.left = `${x + 20}px`;
+        card.style.top = `${y - 40}px`;
+        card.style.display = state.mode === 'preview' ? 'block' : 'none';
+        card.innerHTML = `
+          <div class="card-header">
+            <span class="card-number">${index + 1}</span>
+            <span class="text-xs text-gray-400">批注</span>
+          </div>
+          <textarea placeholder="添加批注说明..." onchange="updateAnnotation(${index}, this.value)">${ann.text}</textarea>
+          ${state.mode === 'edit' ? `
+          <div class="card-actions">
+            <button onclick="deleteAnnotation(${index})" class="text-xs text-red-500 hover:text-red-700">删除</button>
+          </div>
+          ` : ''}
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // 切换批注卡片显示
+    function toggleAnnotationCard(index) {
+      const card = document.getElementById(`card-${index}`);
+      if (card) {
+        card.style.display = card.style.display === 'none' ? 'block' : 'none';
+      }
+    }
+
+    // 更新批注
+    function updateAnnotation(index, text) {
+      state.pages[state.currentPage].annotations[index].text = text;
+      renderAnnotationList();
+    }
+
+    // 删除批注
+    function deleteAnnotation(index) {
+      state.pages[state.currentPage].annotations.splice(index, 1);
+      renderCurrentPage();
+      renderAnnotationList();
+    }
+
+    // 渲染批注列表
+    function renderAnnotationList() {
+      const list = document.getElementById('annotationList');
+      const noText = document.getElementById('noAnnotationText');
+      const annotations = state.pages[state.currentPage].annotations;
+      
+      if (annotations.length === 0) {
+        list.innerHTML = '';
+        noText.style.display = 'block';
+        return;
+      }
+      
+      noText.style.display = 'none';
+      list.innerHTML = annotations.map((ann, index) => `
+        <div class="bg-gray-50 rounded-lg p-3 cursor-pointer hover:bg-gray-100" onclick="highlightAnnotation(${index})">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="bg-red-500 text-white w-5 h-5 rounded-full flex items-center justify-center text-xs">${index + 1}</span>
+            <span class="text-xs text-gray-500">元素: ${ann.elementId}</span>
+          </div>
+          <p class="text-sm text-gray-700">${ann.text || '（空批注）'}</p>
+        </div>
+      `).join('');
+    }
+
+    // 高亮批注
+    function highlightAnnotation(index) {
+      const card = document.getElementById(`card-${index}`);
+      if (card) {
+        card.style.display = 'block';
+      }
+    }
+
+    // 点击元素添加批注
+    document.addEventListener('click', function(e) {
+      if (state.mode !== 'edit') return;
+      
+      const annotatable = e.target.closest('.annotatable');
+      if (annotatable) {
+        const elementId = annotatable.getAttribute('data-element-id');
+        const existing = state.pages[state.currentPage].annotations.find(a => a.elementId === elementId);
+        
+        if (existing) {
+          alert('该元素已有批注，请在批注列表中编辑');
+        } else {
+          const text = prompt('请输入批注内容:');
+          if (text) {
+            state.pages[state.currentPage].annotations.push({
+              elementId: elementId,
+              text: text
+            });
+            renderCurrentPage();
+            renderAnnotationList();
+          }
+        }
+      }
+    });
+
+    // 设置模式
+    function setMode(mode) {
+      state.mode = mode;
+      document.getElementById('editBtn').classList.toggle('active', mode === 'edit');
+      document.getElementById('previewBtn').classList.toggle('active', mode === 'preview');
+      document.getElementById('app').classList.toggle('preview-mode', mode === 'preview');
+      renderCurrentPage();
+    }
+
+    // 清除所有批注
+    function clearAllAnnotations() {
+      if (confirm('确定要清除当前页面的所有批注吗？')) {
+        state.pages[state.currentPage].annotations = [];
+        renderCurrentPage();
+        renderAnnotationList();
+      }
+    }
+
+    // 显示/隐藏批注
+    function toggleAllAnnotations() {
+      state.showAnnotations = !state.showAnnotations;
+      renderCurrentPage();
+    }
+
+    // 导出HTML
+    function exportToHTML() {
+      const html = document.documentElement.outerHTML;
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'prototype-with-annotations.html';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // 打印/分享
+    function printPrototype() {
+      window.print();
+    }
+
+    // 初始化
+    init();
+  </script>
+</body>
+</html>
