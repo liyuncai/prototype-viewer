@@ -1,0 +1,4588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>原型查看器 - 连接Axure预览</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --success: #10B981;
+            --bg-dark: #1F2937;
+            --bg-light: #F9FAFB;
+            --border: #E5E7EB;
+            --text: #111827;
+            --text-light: #6B7280;
+            --annotation-bg: #FEF2F2;
+            --annotation-border: #EF4444;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-light);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航 */
+        .header {
+            background: white;
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 60px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 18px;
+            color: var(--primary);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .mode-switch {
+            display: flex;
+            background: var(--bg-light);
+            border-radius: 8px;
+            padding: 4px;
+        }
+
+        .mode-btn {
+            padding: 6px 16px;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-light);
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background: white;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-light);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        /* 主内容区 */
+        .main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 左侧面板 */
+        .sidebar {
+            width: 220px;
+            background: white;
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 500;
+            color: var(--text-light);
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-light);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+
+        .sidebar-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .thumbnail-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .thumbnail-item {
+            border: 2px solid transparent;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .thumbnail-item:hover {
+            border-color: var(--primary);
+        }
+
+        .thumbnail-item.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+        }
+
+        .thumbnail-item img {
+            width: 100%;
+            display: block;
+        }
+
+        .thumbnail-name {
+            padding: 8px;
+            font-size: 12px;
+            color: var(--text-light);
+            text-align: center;
+            background: var(--bg-light);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .thumbnail-add {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            color: var(--text-light);
+            transition: all 0.2s;
+        }
+
+        .thumbnail-add:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Axure连接面板 */
+        .axure-connect {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .axure-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px;
+            background: var(--bg-light);
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9CA3AF;
+        }
+
+        .status-dot.connected {
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        .connect-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .connect-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .connect-hint {
+            font-size: 11px;
+            color: var(--text-light);
+            line-height: 1.5;
+        }
+
+        /* 中间画布 */
+        .canvas-area {
+            flex: 1;
+            background: #1a1a1a;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            overflow: auto;
+            position: relative;
+        }
+
+        .canvas-container {
+            position: relative;
+            background: white;
+            box-shadow: 0 4px 40px rgba(0,0,0,0.5);
+            width: 100%;
+            height: 100%;
+            min-width: fit-content;
+            min-height: fit-content;
+        }
+
+        .canvas-container img {
+            display: block;
+            max-width: none;
+        }
+
+        .canvas-container iframe {
+            display: block;
+            width: 100vw;
+            height: calc(100vh - 60px);
+            min-width: 1400px;
+            min-height: 900px;
+            border: none;
+        }
+
+        /* 批注层 - 默认不拦截事件，让Axure可以交互 */
+        .annotations-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* 添加批注模式 - 只拦截点击，不拦截滚动 */
+        .annotations-layer.interactive {
+            pointer-events: auto;
+            cursor: crosshair;
+        }
+
+        /* 批注点始终可点击 */
+        .annotation-dot {
+            pointer-events: auto;
+        }
+
+        /* 批注点 */
+        .annotation-dot {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            background: var(--annotation-border);
+            border-radius: 50%;
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+            transition: all 0.2s;
+            z-index: 10;
+            pointer-events: auto;
+        }
+
+        .annotation-dot:hover {
+            transform: translate(-50%, -50%) scale(1.2);
+        }
+
+        /* 批注卡片 */
+        .annotation-card {
+            position: absolute;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+            width: 300px;
+            z-index: 100;
+            display: none;
+            overflow: hidden;
+        }
+
+        .annotation-card.visible {
+            display: block;
+        }
+
+        .annotation-card-header {
+            background: var(--annotation-bg);
+            padding: 12px 16px;
+            border-bottom: 1px solid #FECACA;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .annotation-card-number {
+            background: var(--annotation-border);
+            color: white;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .annotation-card-title {
+            flex: 1;
+            margin-left: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+            border: none;
+            outline: none;
+            background: transparent;
+        }
+
+        .annotation-card-delete {
+            color: var(--annotation-border);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .annotation-card-delete:hover {
+            background: #FEE2E2;
+        }
+
+        .annotation-card-body {
+            padding: 14px 16px;
+        }
+
+        .annotation-card-text {
+            width: 100%;
+            min-height: 80px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 13px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .annotation-card-text:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .annotation-card-footer {
+            padding: 10px 16px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .annotation-card-btn {
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            border: none;
+            font-weight: 500;
+        }
+
+        .annotation-card-save {
+            background: var(--primary);
+            color: white;
+        }
+
+        .annotation-card-cancel {
+            background: var(--bg-light);
+            color: var(--text-light);
+        }
+
+        /* 右侧批注列表 */
+        .annotations-panel {
+            width: 300px;
+            background: white;
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .annotations-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .annotations-count {
+            background: var(--primary);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+
+        .annotations-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .annotation-item {
+            background: var(--bg-light);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .annotation-item:hover {
+            border-color: var(--primary);
+        }
+
+        .annotation-item-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .annotation-item-number {
+            background: var(--annotation-border);
+            color: white;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .annotation-item-title {
+            flex: 1;
+            margin-left: 8px;
+            font-size: 13px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+        
+        .annotation-item:hover .annotation-item-title {
+            color: var(--primary);
+        }
+        
+        .annotation-item-delete {
+            color: #EF4444;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-left: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .annotation-item:hover .annotation-item-delete {
+            opacity: 1;
+        }
+        
+        .annotation-item-delete:hover {
+            background: #FEE2E2;
+        }
+
+        .annotation-item-content {
+            font-size: 12px;
+            color: var(--text-light);
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* 已解决状态 */
+        .annotation-item.resolved {
+            opacity: 0.6;
+        }
+        .annotation-item.resolved .annotation-item-number {
+            background: #10B981;
+        }
+        .annotation-item.resolved .annotation-item-title {
+            text-decoration: line-through;
+            color: #9CA3AF;
+        }
+        .annotation-dot.resolved {
+            background: #10B981 !important;
+        }
+        .annotation-dot.resolved::after {
+            content: '✓';
+            position: absolute;
+            font-size: 12px;
+            color: white;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        /* 批注状态标签 */
+        .anno-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 6px;
+        }
+        .anno-status-badge.open { background: #fee2e2; color: #dc2626; }
+        .anno-status-badge.resolved { background: #dcfce7; color: #16a34a; }
+
+        /* 批注卡片底部操作栏 */
+        .annotation-card-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px 10px;
+            border-top: 1px solid var(--border);
+        }
+        .annotation-card-action-btn {
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: white;
+            color: var(--text-light);
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            transition: all 0.15s;
+        }
+        .annotation-card-action-btn:hover { border-color: var(--primary); color: var(--primary); }
+        .annotation-card-action-btn.resolved { border-color: #10B981; color: #10B981; }
+        
+        /* 回复区域 */
+        .anno-replies {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+        .anno-reply-item {
+            font-size: 12px;
+            padding: 6px 8px;
+            background: #f8fafc;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            border-left: 2px solid #e5e7eb;
+        }
+        .anno-reply-author {
+            font-weight: 600;
+            color: #4F46E5;
+            margin-right: 4px;
+        }
+        .anno-reply-text { color: #374151; }
+        .anno-reply-time { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+        .anno-mention { color: #4F46E5; font-weight: 500; }
+        
+        /* 回复输入框 */
+        .anno-reply-input-wrap {
+            margin-top: 8px;
+            display: flex;
+            gap: 6px;
+        }
+        .anno-reply-input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: inherit;
+            outline: none;
+        }
+        .anno-reply-input:focus { border-color: var(--primary); }
+        .anno-reply-send {
+            padding: 6px 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 40px;
+            color: var(--text-light);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-title {
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .empty-desc {
+            font-size: 13px;
+            margin-bottom: 20px;
+        }
+
+        /* 上传模态框 */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.visible {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-close {
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: rgba(79, 70, 229, 0.05);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .upload-text {
+            font-size: 14px;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .upload-input {
+            display: none;
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* 分享模态框 */
+        .share-options {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .share-option {
+            flex: 1;
+            padding: 20px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .share-option:hover {
+            border-color: var(--primary);
+            background: rgba(79, 70, 229, 0.05);
+        }
+
+        .share-option-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .share-option-title {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .share-option-desc {
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+                .share-link-box {
+                    background: var(--bg-light);
+                    border-radius: 8px;
+                    padding: 12px;
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 10px;
+                }
+
+        .share-link-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: 13px;
+            color: var(--text);
+            font-family: inherit;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .copy-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* 刷新按钮 */
+        .refresh-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 50;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: var(--bg-light);
+        }
+
+        .refresh-icon {
+            font-size: 14px;
+        }
+
+        /* 响应式 */
+        @media (max-width: 1200px) {
+            .annotations-panel {
+                width: 260px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .sidebar {
+                width: 180px;
+            }
+            .annotations-panel {
+                display: none;
+            }
+        }
+
+        /* Axure全屏模式 */
+        .axure-fullscreen {
+            position: fixed !important;
+            top: 60px !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: calc(100vh - 60px) !important;
+            z-index: 100;
+            min-width: 1400px;
+            min-height: 900px;
+        }
+
+        .axure-fullscreen iframe {
+            width: 100% !important;
+            height: 100% !important;
+            min-width: 100% !important;
+            min-height: 100% !important;
+            border: none;
+        }
+
+        /* 批注层在Axure模式下的样式 */
+        .axure-fullscreen .annotations-layer {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            pointer-events: none;
+            min-width: 1400px;
+            min-height: 900px;
+        }
+
+        .axure-fullscreen .annotations-layer.interactive {
+            pointer-events: auto;
+        }
+
+        /* 右键菜单 */
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 8px 0;
+            z-index: 1000;
+            min-width: 160px;
+            display: none;
+        }
+
+        .context-menu.visible {
+            display: block;
+        }
+
+        .context-menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .context-menu-item:hover {
+            background: var(--bg-light);
+        }
+
+        .context-menu-item.danger {
+            color: #EF4444;
+        }
+
+        .context-menu-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 6px 0;
+        }
+
+        /* 批注模式指示器 */
+        .annotation-mode-indicator {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #EF4444;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 200;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
+        }
+
+        .annotation-mode-indicator.visible {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航 -->
+    <header class="header">
+        <div class="logo">
+            <div class="logo-icon">📐</div>
+            <span>原型查看器</span>
+        </div>
+        
+        <div class="mode-switch">
+            <button class="mode-btn active" data-mode="axure" onclick="switchMode('axure')">
+                🔗 连接Axure
+            </button>
+            <button class="mode-btn" data-mode="upload" onclick="switchMode('upload')">
+                📁 上传图片
+            </button>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn btn-secondary" id="fullscreenBtn" onclick="toggleFullscreen()" style="display: none;">
+                <span>⛶</span> 全屏
+            </button>
+            <button class="btn btn-secondary" onclick="refreshAnnotationsPosition()" style="display: none;" id="refreshPosBtn">
+                <span>🔄</span> 刷新批注位置
+            </button>
+            <button class="btn btn-success" onclick="saveAsStandalone()" style="display: none;" id="saveAsStandaloneBtn">
+                <span>💾</span> 保存当前版本
+            </button>
+            <button class="btn btn-primary" onclick="openShareModal()">
+                <span>🔗</span> 分享
+            </button>
+        </div>
+    </header>
+
+    <!-- 批注模式指示器 -->
+    <div class="annotation-mode-indicator" id="annotationModeIndicator">
+        <span>✏️</span>
+        <span>批注模式 - 点击添加批注</span>
+        <button onclick="exitAnnotationMode()" style="margin-left: 12px; background: rgba(255,255,255,0.2); border: none; color: white; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">结束</button>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" onclick="startAnnotationFromContext()">
+            <span>➕</span> 添加批注
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="refreshAxure()">
+            <span>🔄</span> 刷新页面
+        </div>
+        <div class="context-menu-item" onclick="toggleFullscreen()">
+            <span>⛶</span> 切换全屏
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <main class="main">
+        <!-- 左侧面板 -->
+        <aside class="sidebar">
+            <!-- Axure连接模式 -->
+            <div class="axure-connect" id="axurePanel">
+                <div class="axure-status">
+                    <div class="status-dot" id="axureStatus"></div>
+                    <span class="status-text" id="axureStatusText">未连接</span>
+                </div>
+                <input type="text" class="connect-input" id="axureUrl" placeholder="输入Axure预览地址">
+                <button class="btn btn-success" style="width: 100%" onclick="connectAxure()">
+                    🚀 连接预览
+                </button>
+                <div class="connect-hint" style="margin-top: 12px;">
+                    <strong>使用步骤：</strong><br>
+                    1. 在Axure中点击「预览」按钮<br>
+                    2. 复制浏览器地址栏的URL<br>
+                    3. 粘贴到上方并点击连接
+                </div>
+            </div>
+
+            <!-- 上传模式面板 -->
+            <div class="axure-connect" id="uploadPanel" style="display: none;">
+                <button class="btn btn-primary" style="width: 100%; margin-bottom: 12px;" onclick="openUploadModal()">
+                    📤 上传原型图片
+                </button>
+                <button class="btn btn-success" style="width: 100%;" onclick="uploadAxureHTML()">
+                    📦 上传Axure导出的HTML
+                </button>
+                <div class="connect-hint" style="margin-top: 12px;">
+                    支持上传Axure/墨刀导出的图片，或上传Axure导出的完整HTML包
+                </div>
+            </div>
+
+            <!-- 添加批注按钮（仅在Axure连接后显示）-->
+            <div class="axure-connect" id="addAnnotationPanel" style="display: none;">
+                <div style="padding: 10px; background: #E0E7FF; border-radius: 6px; margin-bottom: 12px; font-size: 13px; color: #3730A3;">
+                    <div style="font-weight: 500; margin-bottom: 4px;">当前页面</div>
+                    <div id="currentAxurePage">加载中...</div>
+                </div>
+                <button class="btn btn-primary" id="addAnnotationBtn" style="width: 100%" onclick="toggleAnnotationMode()">
+                    ➕ 添加批注
+                </button>
+                <div class="connect-hint" style="margin-top: 12px;" id="annotationHint">
+                    点击按钮进入批注模式，然后在原型上点击添加标记
+                </div>
+            </div>
+
+            <div class="sidebar-tabs">
+                <div class="sidebar-tab active" onclick="switchTab('pages')">页面</div>
+                <div class="sidebar-tab" onclick="switchTab('frames')">框架</div>
+            </div>
+            
+            <div class="thumbnail-list" id="thumbnailList">
+                <div class="empty-state" style="padding: 20px;">
+                    <div class="empty-title">暂无页面</div>
+                    <div class="empty-desc">连接Axure后自动获取</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 中间画布 -->
+        <div class="canvas-area" id="canvasArea">
+            <button class="refresh-btn" id="refreshBtn" style="display: none;" onclick="refreshAxure()">
+                <span class="refresh-icon">🔄</span>
+                <span>刷新</span>
+            </button>
+            
+            <!-- 批注跳转提示 -->
+            <div id="annotationJumpHint" style="display: none; position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #4F46E5; color: white; padding: 8px 16px; border-radius: 20px; font-size: 13px; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                <span>🎯</span> 已跳转到批注位置
+            </div>
+            
+            <div class="empty-state" id="emptyState">
+                <div class="empty-icon">🔗</div>
+                <div class="empty-title">加载原型</div>
+                <div class="empty-desc">连接Axure预览或上传Axure导出的HTML包</div>
+            </div>
+            
+            <div class="canvas-container" id="canvasContainer" style="display: none;">
+                <iframe id="axureFrame" src="" allowfullscreen></iframe>
+                <div class="annotations-layer" id="annotationsLayer"></div>
+            </div>
+        </div>
+
+        <!-- 右侧批注列表 -->
+        <aside class="annotations-panel">
+            <div class="annotations-header">
+                <span>批注列表</span>
+                <span class="annotations-count" id="annotationCount">0</span>
+            </div>
+            <div class="annotations-list" id="annotationsList">
+                <div class="empty-state">
+                    <div class="empty-title">暂无批注</div>
+                    <div class="empty-desc">点击原型上的位置添加批注</div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- 上传模态框 -->
+    <div class="modal-overlay" id="uploadModal">
+        <div class="modal">
+            <div class="modal-header">
+                上传原型图片
+                <span class="modal-close" onclick="closeUploadModal()">×</span>
+            </div>
+            <div class="modal-body">
+                <div class="upload-zone" id="uploadZone" onclick="document.getElementById('uploadInput').click()">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">点击或拖拽图片到这里</div>
+                    <div class="upload-hint">支持 PNG、JPG、JPEG 格式</div>
+                    <input type="file" class="upload-input" id="uploadInput" accept="image/*" multiple>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeUploadModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分享模态框 -->
+    <div class="modal-overlay" id="shareModal">
+        <div class="modal" style="max-width: 520px; width: 95vw;">
+            <div class="modal-header">
+                分享原型
+                <span class="modal-close" onclick="closeShareModal()">×</span>
+            </div>
+        <div class="modal-body">
+            <!-- Axure模式分享选项 -->
+            <div id="shareAxureOptions" style="display: none;">
+                <div style="margin-bottom: 16px; padding: 14px 16px; background: #f0f4ff; border-radius: 8px; border-left: 3px solid #4F46E5; font-size: 13px;">
+                    <div style="font-weight: 600; margin-bottom: 4px; color: #3730A3;">📤 导出协作标注包</div>
+                    <div style="color: #555;">截取每个页面快照，打包成独立 HTML。对方打开后可<strong>查看原型 + 协作标注</strong>。</div>
+                </div>
+
+                <!-- 页面选择区 -->
+                <div style="margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <div style="font-size: 13px; font-weight: 600; color: #374151;">选择要分享的页面</div>
+                        <div style="display: flex; gap: 8px;">
+                            <span style="font-size: 12px; color: #4F46E5; cursor: pointer;" onclick="selectAllSharePages(true)">全选</span>
+                            <span style="color: #ccc;">|</span>
+                            <span style="font-size: 12px; color: #999; cursor: pointer;" onclick="selectAllSharePages(false)">取消全选</span>
+                        </div>
+                    </div>
+                    <div id="sharePageList" style="max-height: 200px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px;">
+                        <div style="padding: 20px; text-align: center; color: #999; font-size: 13px;" id="sharePageListLoading">正在读取页面列表...</div>
+                    </div>
+                    <div style="margin-top: 6px; font-size: 12px; color: #999;" id="sharePageCount"></div>
+                </div>
+
+                <!-- 云端协作入口 -->
+                <div style="margin-bottom: 14px; padding: 14px 16px; background: #f0fdf4; border-radius: 8px; border-left: 3px solid #10B981; font-size: 13px;">
+                    <div style="font-weight: 600; margin-bottom: 4px; color: #065F46;">☁️ 云端协作</div>
+                    <div style="color: #555;">上传到云端，多人实时协作批注。无需导出文件，生成链接即可分享。</div>
+                </div>
+                <div class="share-options" style="grid-template-columns: 1fr;">
+                    <div class="share-option" id="cloudShareBtn" onclick="openCloudShare()">
+                        <div class="share-option-icon">☁️</div>
+                        <div>
+                            <div class="share-option-title">上传到云端协作</div>
+                            <div class="share-option-desc">截图页面 + 批注上传到云端，生成协作链接</div>
+                        </div>
+                    </div>
+                    <div class="share-option" id="cloudJoinBtn" onclick="showCloudJoin()" style="display:none;">
+                        <div class="share-option-icon">🔗</div>
+                        <div>
+                            <div class="share-option-title" id="cloudProjectTitle">已关联云项目</div>
+                            <div class="share-option-desc" id="cloudProjectDesc">点击查看协作链接</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align:center; color:#ccc; margin: 12px 0; font-size: 12px;">—— 或导出为文件 ——</div>
+
+                <div class="share-options" style="grid-template-columns: 1fr;">
+                    <div class="share-option" onclick="exportAxureWithScreenshots()">
+                        <div class="share-option-icon">📸</div>
+                        <div>
+                            <div class="share-option-title">导出分享包（截图 + 协作标注）</div>
+                            <div class="share-option-desc">截图所选页面，生成可协作标注的独立 HTML 文件</div>
+                        </div>
+                    </div>
+                    <div class="share-option" onclick="exportAxureAnnotationDoc()">
+                        <div class="share-option-icon">📝</div>
+                        <div>
+                            <div class="share-option-title">仅导出批注文档</div>
+                            <div class="share-option-desc">导出批注列表（不含截图），适合配合截图工具使用</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 上传模式分享选项 -->
+            <div id="shareUploadOptions" style="display: none;">
+                <div class="share-options">
+                    <div class="share-option" onclick="exportHTML()">
+                        <div class="share-option-icon">📦</div>
+                        <div class="share-option-title">导出HTML</div>
+                        <div class="share-option-desc">下载文件发给技术同学</div>
+                    </div>
+                    <div class="share-option" onclick="exportWithImages()">
+                        <div class="share-option-icon">📸</div>
+                        <div class="share-option-title">导出图片+批注</div>
+                        <div class="share-option-desc">导出带批注标记的图片</div>
+                    </div>
+                </div>
+            </div>
+            <div id="shareProgress" style="display: none;">
+                <div style="text-align: center; padding: 30px;">
+                    <div style="font-size: 32px; margin-bottom: 12px;" id="shareProgressIcon">📸</div>
+                    <div style="font-weight: 500; margin-bottom: 8px;" id="shareProgressTitle">正在截取页面...</div>
+                    <div style="font-size: 13px; color: #666;" id="shareProgressDesc">请稍候，不要关闭此窗口</div>
+                    <div style="margin-top: 16px; background: #f0f0f0; border-radius: 8px; height: 8px; overflow: hidden;">
+                        <div id="shareProgressBar" style="width: 0%; height: 100%; background: #4F46E5; border-radius: 8px; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="share-link-box" id="shareLinkBox" style="display: none;">
+                <textarea class="share-link-input" id="shareLink" readonly rows="10"></textarea>
+                <button class="copy-btn" onclick="copyShareLink()">复制</button>
+            </div>
+        </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeShareModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批注编辑卡片 -->
+    <div class="annotation-card" id="annotationCard">
+        <div class="annotation-card-header">
+            <div class="annotation-card-number" id="cardNumber">1</div>
+            <input type="text" class="annotation-card-title" id="cardTitle" placeholder="批注标题">
+            <div class="annotation-card-delete" onclick="deleteAnnotation()" title="删除批注">🗑️</div>
+        </div>
+        <div class="annotation-card-body">
+            <textarea class="annotation-card-text" id="cardContent" placeholder="输入批注内容... 支持 @名字 提及成员"></textarea>
+        </div>
+        <!-- 回复列表 -->
+        <div id="cardRepliesSection" style="display:none; padding: 0 16px 6px;">
+            <div id="cardRepliesList"></div>
+            <div class="anno-reply-input-wrap">
+                <input class="anno-reply-input" id="cardReplyInput" placeholder="回复... 支持 @名字" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendReply();}">
+                <button class="anno-reply-send" onclick="sendReply()">发送</button>
+            </div>
+        </div>
+        <!-- 操作按钮行 -->
+        <div class="annotation-card-actions">
+            <button id="cardResolveBtn" class="annotation-card-action-btn" onclick="toggleResolve()">✅ 标记已解决</button>
+            <button class="annotation-card-action-btn" onclick="toggleReplies()">💬 回复</button>
+        </div>
+        <div class="annotation-card-footer">
+            <button class="annotation-card-btn annotation-card-cancel" onclick="cancelAnnotation()">取消</button>
+            <button class="annotation-card-btn annotation-card-save" onclick="saveAnnotation()">保存</button>
+        </div>
+    </div>
+
+    <script>
+        // 数据
+        let currentMode = 'axure';
+        let axureConnected = false;
+        let axureUrl = '';
+        let pages = [];
+        let currentPageIndex = -1;
+        let annotations = {};
+        let currentAnnotation = null;
+        let nextAnnotationId = 1;
+        let annotationMode = false; // 批注模式开关
+        let axurePagePath = ''; // Axure 当前页面路径（用于区分不同页面的批注）
+
+        // DOM
+        const canvasArea = document.getElementById('canvasArea');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const axureFrame = document.getElementById('axureFrame');
+        const annotationsLayer = document.getElementById('annotationsLayer');
+        const emptyState = document.getElementById('emptyState');
+        const thumbnailList = document.getElementById('thumbnailList');
+        const annotationsList = document.getElementById('annotationsList');
+        const annotationCount = document.getElementById('annotationCount');
+        const annotationCard = document.getElementById('annotationCard');
+        const uploadModal = document.getElementById('uploadModal');
+        const shareModal = document.getElementById('shareModal');
+        const axurePanel = document.getElementById('axurePanel');
+        const uploadPanel = document.getElementById('uploadPanel');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        const contextMenu = document.getElementById('contextMenu');
+        const annotationModeIndicator = document.getElementById('annotationModeIndicator');
+
+        // 状态
+        let isFullscreen = true; // 默认全屏模式
+        let contextMenuPosition = { x: 0, y: 0 };
+
+        // 初始化
+        function init() {
+            // 优先检查预加载数据
+            if (window.preloadedData) {
+                const data = window.preloadedData;
+                pages = data.pages || [];
+                annotations = data.annotations || {};
+                nextAnnotationId = data.nextAnnotationId || 1;
+                axureUrl = data.axureUrl || '';
+
+                // 自动填充URL并连接
+                if (axureUrl) {
+                    document.getElementById('axureUrl').value = axureUrl;
+                    setTimeout(() => connectAxure(), 500);
+                }
+                return; // 跳过后续的本地存储加载
+            }
+
+            // 从本地存储加载
+            loadFromStorage();
+            const savedAxureUrl = localStorage.getItem('axureUrl');
+            if (savedAxureUrl) {
+                document.getElementById('axureUrl').value = savedAxureUrl;
+            }
+        }
+
+        // 保存到本地存储
+        function saveToStorage() {
+            const data = { pages, annotations, nextAnnotationId, axureUrl };
+            localStorage.setItem('prototypeViewer', JSON.stringify(data));
+        }
+
+        // 从本地存储加载
+        function loadFromStorage() {
+            const saved = localStorage.getItem('prototypeViewer');
+            if (saved) {
+                const data = JSON.parse(saved);
+                pages = data.pages || [];
+                annotations = data.annotations || {};
+                nextAnnotationId = data.nextAnnotationId || 1;
+                axureUrl = data.axureUrl || '';
+            }
+        }
+
+        // 切换模式
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mode === mode);
+            });
+            
+            axurePanel.style.display = mode === 'axure' ? 'block' : 'none';
+            uploadPanel.style.display = mode === 'upload' ? 'block' : 'none';
+            
+            if (mode === 'axure' && axureConnected) {
+                canvasContainer.style.display = 'block';
+                emptyState.style.display = 'none';
+                refreshBtn.style.display = 'flex';
+                
+                // 设置全屏样式
+                canvasContainer.classList.add('axure-fullscreen');
+                axureFrame.style.width = '100%';
+                axureFrame.style.height = '100%';
+                
+                annotationsLayer.style.position = 'absolute';
+                annotationsLayer.style.width = '100%';
+                annotationsLayer.style.height = '100%';
+                annotationsLayer.style.top = '0';
+                annotationsLayer.style.left = '0';
+                
+                renderAnnotations();
+            } else if (mode === 'upload' && pages.length > 0) {
+                canvasContainer.classList.remove('axure-fullscreen');
+                switchToPage(currentPageIndex >= 0 ? currentPageIndex : 0);
+                refreshBtn.style.display = 'none';
+            }
+        }
+
+        // 连接Axure
+        function connectAxure() {
+            console.log('connectAxure called');
+            
+            const urlInput = document.getElementById('axureUrl');
+            const url = urlInput ? urlInput.value.trim() : '';
+            console.log('URL:', url);
+            
+            if (!url) {
+                alert('请输入Axure预览地址');
+                return;
+            }
+            
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                alert('请输入完整的URL地址，以http://或https://开头');
+                return;
+            }
+            
+            // 判断是否需要代理（不同源时自动启用代理）
+            let actualUrl = url;
+            const currentOrigin = window.location.origin;
+            const axureOrigin = url.replace(/\/[^/].*$/, '');
+            const needProxy = (axureOrigin !== currentOrigin);
+            
+            if (needProxy) {
+                // 转换为代理 URL: http://127.0.0.1:9090/axure-proxy/http/原始地址
+                actualUrl = currentOrigin + '/axure-proxy/' + url.substring(url.indexOf('://') + 3);
+                console.log('使用代理模式:', actualUrl);
+            } else {
+                console.log('同源模式，无需代理');
+            }
+            
+            // 保存原始URL（用于导出等场景）
+            axureUrl = url;
+            localStorage.setItem('axureUrl', url);
+            
+            // 1. 隐藏侧边栏和右侧面板
+            // document.querySelector('.sidebar').style.display = 'none';  // 不隐藏侧边栏
+            // document.querySelector('.annotations-panel').style.display = 'none';  // 不隐藏右侧面板
+            console.log('Sidebars保持显示');
+
+            // 2. 显示iframe（使用代理后的URL）
+            axureFrame.src = actualUrl;
+            canvasContainer.style.display = 'block';
+            canvasContainer.classList.add('axure-fullscreen');
+            emptyState.style.display = 'none';
+            // 刷新按钮不显示
+            refreshBtn.style.display = 'none';
+            console.log('Iframe shown');
+            
+            // 3. 更新状态
+            document.getElementById('axureStatus').classList.add('connected');
+            document.getElementById('axureStatusText').textContent = '已连接';
+            axureConnected = true;
+            
+            // 4. 显示添加批注面板
+            document.getElementById('addAnnotationPanel').style.display = 'block';
+            
+            // 5. 显示全屏按钮
+            const fsBtn = document.getElementById('fullscreenBtn');
+            if (fsBtn) {
+                fsBtn.style.display = 'flex';
+            }
+            
+            // 6. 显示刷新位置按钮
+            const refreshPosBtn = document.getElementById('refreshPosBtn');
+            if (refreshPosBtn) {
+                refreshPosBtn.style.display = 'flex';
+            }
+            
+            // 7. 显示保存当前版本按钮
+            const saveAsStandaloneBtn = document.getElementById('saveAsStandaloneBtn');
+            if (saveAsStandaloneBtn) {
+                saveAsStandaloneBtn.style.display = 'flex';
+            }
+            
+            isFullscreen = true;
+            
+            // 6. 设置iframe滚动监听
+            axureFrame.onload = function() {
+                console.log('Iframe loaded, src:', axureFrame.src);
+
+                // 初始化页面路径 - 从 src 提取（Axure初次加载时src包含#p=）
+                const initPage = extractPageNameFromUrl(axureFrame.src);
+                if (initPage) {
+                    axurePagePath = initPage;
+                    console.log('从src初始化页面名:', axurePagePath);
+                } else {
+                    // 尝试同域访问
+                    try {
+                        const iframeDoc = axureFrame.contentDocument || axureFrame.contentWindow.document;
+                        if (iframeDoc && iframeDoc.title) {
+                            axurePagePath = iframeDoc.title;
+                            console.log('从title初始化页面名:', axurePagePath);
+                        }
+                    } catch(e) { /* 跨域 */ }
+                }
+
+                // 更新当前页面显示
+                updateCurrentPageDisplay();
+
+                setupIframeScrollListener();
+                setupAxurePageTracking();
+                renderAnnotations();
+                renderAnnotationsList();
+            };
+            
+            console.log('Connect finished');
+        }
+
+        // 切换全屏模式
+        function toggleFullscreen() {
+            isFullscreen = !isFullscreen;
+
+            if (isFullscreen) {
+                // 进入全屏
+                document.querySelector('.sidebar').style.display = 'none';
+                document.querySelector('.annotations-panel').style.display = 'none';
+                canvasContainer.classList.add('axure-fullscreen');
+                fullscreenBtn.innerHTML = '<span>⛶</span> 退出全屏';
+
+                // 延迟重新设置滚动监听，确保 DOM 更新完成
+                setTimeout(() => {
+                    setupIframeScrollListener();
+                    renderAnnotations();
+                }, 100);
+            } else {
+                // 退出全屏
+                document.querySelector('.sidebar').style.display = 'flex';
+                document.querySelector('.annotations-panel').style.display = 'flex';
+                canvasContainer.classList.remove('axure-fullscreen');
+                fullscreenBtn.innerHTML = '<span>⛶</span> 全屏';
+
+                // 延迟重新设置滚动监听，确保 DOM 更新完成
+                setTimeout(() => {
+                    setupIframeScrollListener();
+                    renderAnnotations();
+                }, 100);
+            }
+        }
+
+        // 设置右键菜单
+        function setupContextMenu() {
+            // 在画布区域禁用默认右键菜单
+            canvasArea.addEventListener('contextmenu', function(e) {
+                // 只有在连接了Axure后才显示自定义菜单
+                if (!axureConnected) return;
+                e.preventDefault();
+                showContextMenu(e.clientX, e.clientY);
+            });
+            
+            // 点击其他地方关闭菜单
+            document.addEventListener('click', function() {
+                hideContextMenu();
+            });
+        }
+
+        // 显示右键菜单
+        function showContextMenu(x, y) {
+            contextMenuPosition = { x, y };
+            contextMenu.style.left = x + 'px';
+            contextMenu.style.top = y + 'px';
+            contextMenu.classList.add('visible');
+        }
+
+        // 隐藏右键菜单
+        function hideContextMenu() {
+            contextMenu.classList.remove('visible');
+        }
+
+        // 从右键菜单开始批注
+        function startAnnotationFromContext() {
+            hideContextMenu();
+            enterAnnotationMode();
+            
+            // 在右键点击位置直接添加批注
+            const rect = annotationsLayer.getBoundingClientRect();
+            const x = contextMenuPosition.x - rect.left;
+            const y = contextMenuPosition.y - rect.top;
+            
+            // 在Axure模式下，需要加上当前滚动偏移量
+            const scrollOffset = getIframeScrollOffset();
+            const storedX = x + scrollOffset.x;
+            const storedY = y + scrollOffset.y;
+
+            console.log('右键创建批注 at (显示坐标):', x, y);
+            console.log('存储坐标（含滚动偏移）:', storedX, storedY);
+
+            // 获取当前页面的批注，编号从1开始
+            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const pageAnnotations = annotations[key] || [];
+            const id = pageAnnotations.length + 1;
+
+            currentAnnotation = {
+                id,
+                pageIndex: key,
+                pagePath: axurePagePath, // 记录页面路径
+                x: storedX,  // 存储包含滚动偏移的绝对坐标
+                y: storedY,
+                title: '',
+                content: '',
+                mode: currentMode
+            };
+
+            showAnnotationCard(x, y, currentAnnotation);
+        }
+
+        // 进入批注模式
+        function enterAnnotationMode() {
+            annotationMode = true;
+            const btn = document.getElementById('addAnnotationBtn');
+            
+            if (btn) {
+                btn.innerHTML = '✓ 完成批注';
+                btn.style.background = '#EF4444';
+            }
+            
+            // 在画布区域添加点击事件（使用捕获阶段）
+            if (canvasArea) {
+                canvasArea.addEventListener('click', handleCanvasClick, true);
+            }
+            
+            // 在批注模式下，让批注层覆盖iframe并拦截所有事件
+            if (annotationsLayer) {
+                annotationsLayer.style.pointerEvents = 'auto';
+                annotationsLayer.style.cursor = 'crosshair';
+            }
+            
+            // 显示批注模式指示器
+            if (annotationModeIndicator) {
+                annotationModeIndicator.classList.add('visible');
+            }
+            
+            console.log('进入批注模式');
+        }
+
+        // 退出批注模式
+        function exitAnnotationMode() {
+            annotationMode = false;
+            const btn = document.getElementById('addAnnotationBtn');
+            
+            if (btn) {
+                btn.innerHTML = '➕ 添加批注';
+                btn.style.background = '';
+            }
+            
+            // 移除画布点击事件
+            if (canvasArea) {
+                canvasArea.removeEventListener('click', handleCanvasClick, true);
+            }
+            
+            // 恢复批注层不拦截事件，让iframe可以交互
+            if (annotationsLayer) {
+                annotationsLayer.style.pointerEvents = 'none';
+                annotationsLayer.style.cursor = '';
+            }
+            
+            // 隐藏批注模式指示器
+            if (annotationModeIndicator) {
+                annotationModeIndicator.classList.remove('visible');
+            }
+            
+            cancelAnnotation();
+            console.log('退出批注模式');
+        }
+
+
+
+        // 切换批注模式（按钮点击）
+        function toggleAnnotationMode() {
+            if (annotationMode) {
+                exitAnnotationMode();
+            } else {
+                enterAnnotationMode();
+            }
+        }
+
+        // 刷新Axure
+        function refreshAxure() {
+            axureFrame.src = axureFrame.src;
+        }
+        
+        // 刷新批注位置
+        function refreshAnnotationsPosition() {
+            const scrollOffset = getIframeScrollOffset();
+            console.log('手动刷新批注位置，当前滚动:', scrollOffset);
+            updateAnnotationPositions(scrollOffset.x, scrollOffset.y);
+        }
+
+        // 渲染Axure缩略图
+        function renderAxureThumbnails() {
+            thumbnailList.innerHTML = `
+                <div class="thumbnail-item active">
+                    <div style="padding: 20px; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); color: white; text-align: center;">
+                        <div style="font-size: 32px; margin-bottom: 8px;">📱</div>
+                        <div style="font-size: 12px;">Axure 预览</div>
+                    </div>
+                    <div class="thumbnail-name">原型预览</div>
+                </div>
+            `;
+        }
+
+        // 处理画布点击
+        function handleCanvasClick(e) {
+            // 只有在批注模式下才处理点击
+            if (!annotationMode) return;
+            
+            // 阻止事件继续传播（防止触发iframe内的点击）
+            e.stopPropagation();
+            e.preventDefault();
+            
+            if (e.target.classList.contains('annotation-dot')) return;
+            if (e.target.closest('.annotation-card')) return; // 点击批注卡片时不创建新批注
+            
+            // 计算相对于批注层的坐标
+            const rect = canvasArea.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // 在Axure模式下，需要加上当前滚动偏移量
+            const scrollOffset = getIframeScrollOffset();
+            const storedX = x + scrollOffset.x;
+            const storedY = y + scrollOffset.y;
+
+            console.log('创建批注 at (显示坐标):', x, y);
+            console.log('存储坐标（含滚动偏移）:', storedX, storedY);
+
+            // 获取当前页面的批注，编号从1开始
+            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const pageAnnotations = annotations[key] || [];
+            const id = pageAnnotations.length + 1;
+
+            currentAnnotation = {
+                id,
+                pageIndex: key,
+                pagePath: axurePagePath, // 记录页面路径
+                x: storedX,  // 存储包含滚动偏移的绝对坐标
+                y: storedY,
+                title: '',
+                content: '',
+                mode: currentMode
+            };
+            showAnnotationCard(x, y, currentAnnotation);
+        }
+
+        // 显示批注编辑卡片
+        function showAnnotationCard(x, y, annotation) {
+            document.querySelectorAll('.annotation-card').forEach(c => c.classList.remove('visible'));
+            
+            let cardX = x + 20;
+            let cardY = y - 100;
+            
+            const cardWidth = 300;
+            const cardHeight = 260;
+            const layerWidth = annotationsLayer.offsetWidth;
+            const layerHeight = annotationsLayer.offsetHeight;
+            
+            if (cardX + cardWidth > layerWidth) {
+                cardX = x - cardWidth - 20;
+            }
+            if (cardY < 0) {
+                cardY = 10;
+            }
+            if (cardY + cardHeight > layerHeight) {
+                cardY = layerHeight - cardHeight - 10;
+            }
+            
+            annotationCard.style.left = cardX + 'px';
+            annotationCard.style.top = cardY + 'px';
+            annotationCard.classList.add('visible');
+            
+            document.getElementById('cardNumber').textContent = annotation.id;
+            document.getElementById('cardTitle').value = annotation.title || '';
+            document.getElementById('cardContent').value = annotation.content || '';
+            
+            // 设置解决状态按钮
+            const resolveBtn = document.getElementById('cardResolveBtn');
+            if (annotation.resolved) {
+                resolveBtn.textContent = '🔄 重新开启';
+                resolveBtn.classList.add('resolved');
+            } else {
+                resolveBtn.textContent = '✅ 标记已解决';
+                resolveBtn.classList.remove('resolved');
+            }
+            
+            // 渲染回复列表（仅在已保存的批注上显示）
+            const repliesSection = document.getElementById('cardRepliesSection');
+            const repliesList = document.getElementById('cardRepliesList');
+            const replies = annotation.replies || [];
+            if (annotation.id && replies.length > 0) {
+                repliesSection.style.display = 'block';
+                repliesList.innerHTML = replies.map(r => `
+                    <div class="anno-reply-item">
+                        <span class="anno-reply-author">${escAnnotation(r.author || '匿名')}</span>
+                        <span class="anno-reply-text">${renderMentions(escAnnotation(r.text || ''))}</span>
+                        <div class="anno-reply-time">${r.time || ''}</div>
+                    </div>`).join('');
+            } else if (annotation.id) {
+                repliesSection.style.display = 'none';
+                repliesList.innerHTML = '';
+            } else {
+                // 新建批注时隐藏回复区
+                repliesSection.style.display = 'none';
+            }
+            
+            document.getElementById('cardTitle').focus();
+        }
+        
+        // 渲染 @提及 高亮
+        function renderMentions(text) {
+            return text.replace(/@(\S+)/g, '<span class="anno-mention">@$1</span>');
+        }
+        
+        // HTML 转义
+        function escAnnotation(s) {
+            if (!s) return '';
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        }
+        
+        // 切换已解决状态
+        function toggleResolve() {
+            if (!currentAnnotation || !currentAnnotation.id) {
+                alert('请先保存批注后再标记状态');
+                return;
+            }
+            const key = currentAnnotation.mode === 'axure'
+                ? (currentAnnotation.pagePath || axurePagePath || 'default')
+                : currentPageIndex;
+            const arr = annotations[key] || [];
+            const anno = arr.find(a => a.id === currentAnnotation.id);
+            if (anno) {
+                anno.resolved = !anno.resolved;
+                currentAnnotation.resolved = anno.resolved;
+                const btn = document.getElementById('cardResolveBtn');
+                if (anno.resolved) {
+                    btn.textContent = '🔄 重新开启';
+                    btn.classList.add('resolved');
+                } else {
+                    btn.textContent = '✅ 标记已解决';
+                    btn.classList.remove('resolved');
+                }
+                saveToStorage();
+                renderAnnotations();
+                renderAnnotationsList();
+            }
+        }
+        
+        // 切换回复区显示
+        function toggleReplies() {
+            if (!currentAnnotation || !currentAnnotation.id) {
+                alert('请先保存批注后再回复');
+                return;
+            }
+            const sec = document.getElementById('cardRepliesSection');
+            sec.style.display = sec.style.display === 'none' ? 'block' : 'none';
+            if (sec.style.display === 'block') {
+                document.getElementById('cardReplyInput').focus();
+            }
+        }
+        
+        // 发送回复
+        function sendReply() {
+            if (!currentAnnotation || !currentAnnotation.id) return;
+            const input = document.getElementById('cardReplyInput');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            const key = currentAnnotation.mode === 'axure'
+                ? (currentAnnotation.pagePath || axurePagePath || 'default')
+                : currentPageIndex;
+            const arr = annotations[key] || [];
+            const anno = arr.find(a => a.id === currentAnnotation.id);
+            if (!anno) return;
+            
+            if (!anno.replies) anno.replies = [];
+            anno.replies.push({
+                author: '我',
+                text: text,
+                time: new Date().toLocaleString('zh-CN')
+            });
+            currentAnnotation.replies = anno.replies;
+            input.value = '';
+            
+            // 重新渲染回复列表
+            const repliesList = document.getElementById('cardRepliesList');
+            repliesList.innerHTML = anno.replies.map(r => `
+                <div class="anno-reply-item">
+                    <span class="anno-reply-author">${escAnnotation(r.author)}</span>
+                    <span class="anno-reply-text">${renderMentions(escAnnotation(r.text))}</span>
+                    <div class="anno-reply-time">${r.time}</div>
+                </div>`).join('');
+            
+            saveToStorage();
+            renderAnnotationsList();
+        }
+
+        // 保存批注
+        function saveAnnotation() {
+            if (!currentAnnotation) return;
+
+            const title = document.getElementById('cardTitle').value.trim();
+            const content = document.getElementById('cardContent').value.trim();
+
+            if (!title && !content) {
+                cancelAnnotation();
+                return;
+            }
+
+            currentAnnotation.title = title || '批注 ' + currentAnnotation.id;
+            currentAnnotation.content = content;
+            currentAnnotation.author = currentAnnotation.author || localStorage.getItem('pv_lastAuthor') || '匿名';
+
+            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            if (!annotations[key]) {
+                annotations[key] = [];
+            }
+            annotations[key].push(currentAnnotation);
+
+            console.log('保存批注 - 页面:', key, '总数:', annotations[key].length);
+
+            saveToStorage();
+            renderAnnotations();
+            renderAnnotationsList();
+
+            // 云端同步：上传新批注
+            pushAnnotationToCloud(
+                currentMode === 'axure' ? key : String(key),
+                {
+                    x: currentAnnotation.x,
+                    y: currentAnnotation.y,
+                    title: currentAnnotation.title,
+                    content: currentAnnotation.content,
+                    author: currentAnnotation.author,
+                    resolved: currentAnnotation.resolved,
+                    replies: currentAnnotation.replies
+                }
+            );
+
+            annotationCard.classList.remove('visible');
+            currentAnnotation = null;
+        }
+        
+        // 重新编号批注（删除后调用）
+        function renumberAnnotations(key) {
+            const arr = annotations[key] || [];
+            arr.forEach((annotation, index) => {
+                annotation.id = index + 1;
+            });
+            annotations[key] = arr;
+            saveToStorage();
+        }
+
+        // 取消批注
+        function cancelAnnotation() {
+            annotationCard.classList.remove('visible');
+            currentAnnotation = null;
+        }
+
+        // 删除批注
+        function deleteAnnotation() {
+            if (!currentAnnotation) return;
+
+            const key = currentAnnotation.mode === 'axure'
+                ? (currentAnnotation.pagePath || axurePagePath || 'default')
+                : currentPageIndex;
+            const arr = annotations[key] || [];
+            const index = arr.findIndex(a => a.id === currentAnnotation.id);
+
+            if (index > -1) {
+                const deleted = arr[index];
+                arr.splice(index, 1);
+                // 重新编号剩余的批注
+                arr.forEach((annotation, idx) => {
+                    annotation.id = idx + 1;
+                });
+                annotations[key] = arr;
+                saveToStorage();
+                renderAnnotations();
+                renderAnnotationsList();
+
+                // 云端同步：删除
+                if (deleted.cloudId) {
+                    deleteAnnotationFromCloud(deleted.cloudId);
+                }
+            }
+
+            annotationCard.classList.remove('visible');
+            currentAnnotation = null;
+        }
+
+        // 渲染批注点
+        function renderAnnotations() {
+            annotationsLayer.innerHTML = '';
+
+            // 在 Axure 模式下，使用页面路径作为 key
+            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const arr = annotations[key] || [];
+
+            console.log('渲染批注 - 当前页面:', key, '数量:', arr.length, '所有页面:', Object.keys(annotations));
+
+            // 获取iframe滚动偏移量
+            const scrollOffset = getIframeScrollOffset();
+
+            arr.forEach(annotation => {
+                const dot = document.createElement('div');
+                dot.className = 'annotation-dot' + (annotation.resolved ? ' resolved' : '');
+                dot.textContent = annotation.id;
+                dot.dataset.annotationId = annotation.id;
+
+                // 计算显示位置（原始位置减去滚动偏移量）
+                const displayX = annotation.x - scrollOffset.x;
+                const displayY = annotation.y - scrollOffset.y;
+
+                dot.style.left = displayX + 'px';
+                dot.style.top = displayY + 'px';
+
+                dot.onclick = (e) => {
+                    e.stopPropagation();
+                    editAnnotation(annotation);
+                };
+
+                annotationsLayer.appendChild(dot);
+            });
+
+            annotationCount.textContent = arr.length;
+        }
+        
+        // 获取iframe滚动偏移量
+        function getIframeScrollOffset() {
+            if (currentMode !== 'axure' || !axureFrame) {
+                console.log('非Axure模式或iframe不存在，返回0偏移');
+                return { x: 0, y: 0 };
+            }
+            
+            // 尝试从iframe获取滚动位置
+            try {
+                const iframeDoc = axureFrame.contentDocument || axureFrame.contentWindow.document;
+                const iframeWindow = axureFrame.contentWindow;
+                
+                if (iframeDoc && iframeWindow) {
+                    const scrollX = iframeWindow.pageXOffset || iframeDoc.documentElement.scrollLeft || iframeDoc.body.scrollLeft || 0;
+                    const scrollY = iframeWindow.pageYOffset || iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop || 0;
+                    window.axureScrollOffset = { x: scrollX, y: scrollY };
+                    console.log('成功获取iframe滚动位置:', { x: scrollX, y: scrollY });
+                    return { x: scrollX, y: scrollY };
+                } else {
+                    console.log('iframe文档或窗口未加载');
+                }
+            } catch (e) {
+                // 跨域限制，无法访问iframe内容
+                console.log('跨域限制，无法访问iframe内容:', e);
+            }
+            
+            // 如果无法访问iframe，尝试从存储的滚动位置获取
+            const fallback = window.axureScrollOffset || { x: 0, y: 0 };
+            console.log('使用备用滚动位置:', fallback);
+            return fallback;
+        }
+        
+        // 设置iframe滚动监听
+        function setupIframeScrollListener() {
+            if (!axureFrame) return;
+
+            // 尝试向iframe注入滚动监听脚本
+            try {
+                const iframeWindow = axureFrame.contentWindow;
+                const iframeDoc = axureFrame.contentDocument || iframeWindow.document;
+
+                if (iframeWindow && iframeDoc) {
+                    console.log('成功访问iframe，设置滚动监听');
+
+                    // 监听iframe内的滚动事件
+                    const handleScroll = function() {
+                        const scrollLeft = iframeWindow.pageXOffset || iframeDoc.documentElement.scrollLeft || 0;
+                        const scrollTop = iframeWindow.pageYOffset || iframeDoc.documentElement.scrollTop || 0;
+
+                        window.axureScrollOffset = { x: scrollLeft, y: scrollTop };
+
+                        // 更新所有批注点位置
+                        updateAnnotationPositions(scrollLeft, scrollTop);
+                    };
+
+                    // 监听多个可能的滚动元素
+                    iframeWindow.addEventListener('scroll', handleScroll, true);
+                    iframeDoc.addEventListener('scroll', handleScroll, true);
+
+                    // 监听Axure特定的滚动容器
+                    const axureContainers = iframeDoc.querySelectorAll('.ax_default, .ax_default_container, [class*="scroll"]');
+                    axureContainers.forEach(container => {
+                        container.addEventListener('scroll', handleScroll, true);
+                    });
+
+                    // 使用MutationObserver监听DOM变化
+                    const observer = new MutationObserver(function(mutations) {
+                        handleScroll();
+                    });
+
+                    observer.observe(iframeDoc.body, {
+                        attributes: true,
+                        childList: true,
+                        subtree: true
+                    });
+
+                    // 初始位置
+                    handleScroll();
+
+                    console.log('滚动监听设置完成');
+                }
+            } catch (e) {
+                console.log('无法直接监听iframe滚动:', e);
+                // 跨域限制，使用备用方案
+                setupFallbackScrollListener();
+            }
+        }
+        
+        // 备用滚动监听方案（当跨域时）
+        function setupFallbackScrollListener() {
+            console.log('使用备用滚动监听方案');
+
+            // 尝试通过捕获鼠标滚轮事件来推断滚动位置
+            let estimatedScrollX = 0;
+            let estimatedScrollY = 0;
+
+            canvasArea.addEventListener('wheel', function(e) {
+                estimatedScrollX += e.deltaX;
+                estimatedScrollY += e.deltaY;
+
+                // 限制滚动范围
+                estimatedScrollX = Math.max(0, estimatedScrollX);
+                estimatedScrollY = Math.max(0, estimatedScrollY);
+
+                window.axureScrollOffset = { x: estimatedScrollX, y: estimatedScrollY };
+                updateAnnotationPositions(estimatedScrollX, estimatedScrollY);
+            }, { passive: true });
+
+            // 单次定时器尝试获取滚动位置（不持续运行）
+            const tryGetScroll = () => {
+                const offset = getIframeScrollOffset();
+                if (offset.x !== 0 || offset.y !== 0) {
+                    updateAnnotationPositions(offset.x, offset.y);
+                }
+            };
+
+            // 初始尝试
+            setTimeout(tryGetScroll, 100);
+            setTimeout(tryGetScroll, 500);
+        }
+
+        // 从 URL 提取页面名称（辅助函数）
+        function extractPageNameFromUrl(url) {
+            if (!url) return '';
+            // Axure URL格式: start.html#id=xxx&p=页面名称&g=1
+            if (url.includes('&p=') || url.includes('#p=')) {
+                const match = url.match(/[#&]p=([^&]+)/);
+                if (match) {
+                    try { return decodeURIComponent(match[1]); } catch(e) { return match[1]; }
+                }
+            }
+            // 从文件名提取
+            const fileMatch = url.match(/\/([^\/]+)\.html/);
+            if (fileMatch && fileMatch[1] !== 'start' && fileMatch[1] !== 'index') {
+                try { return decodeURIComponent(fileMatch[1]); } catch(e) { return fileMatch[1]; }
+            }
+            return '';
+        }
+
+        // 统一的页面切换处理
+        function onAxurePageChange(newPageName) {
+            if (!newPageName || newPageName === axurePagePath) return;
+            console.log('✅ Axure页面切换:', axurePagePath, '->', newPageName);
+            axurePagePath = newPageName;
+            updateCurrentPageDisplay();
+            renderAnnotations();
+            renderAnnotationsList();
+        }
+
+        // 跟踪 Axure 页面切换
+        function setupAxurePageTracking() {
+            // ====== 核心方案：Axure 代理模式（同源）======
+            // 当代理服务器将 Axure 和 prototype-viewer.html 放在同一端口下时，
+            // 可以直接读取 iframe.contentWindow.location.href 来跟踪页面切换
+            let isSameOrigin = false;
+
+            // 检测是否同源（代理模式下同源）
+            try {
+                const testUrl = axureFrame.contentWindow.location.href;
+                isSameOrigin = true;
+                console.log('✅ 同源模式，可直接访问 iframe');
+            } catch(e) {
+                isSameOrigin = false;
+                console.log('⚠️ 跨域模式，使用备用方案');
+            }
+
+            // ====== 方案A：同源时直接监听 hashchange + 定时检测 ======
+            if (isSameOrigin) {
+                try {
+                    const iframeWindow = axureFrame.contentWindow;
+                    // 绑定 hashchange
+                    iframeWindow.addEventListener('hashchange', function() {
+                        const url = iframeWindow.location.href;
+                        const pageName = extractPageNameFromUrl(url);
+                        if (pageName) onAxurePageChange(pageName);
+                    });
+                    // 拦截 history API
+                    const iframeDoc = axureFrame.contentDocument;
+                    const script = iframeDoc.createElement('script');
+                    script.textContent = `
+                        (function() {
+                            var _origPushState = history.pushState;
+                            var _origReplaceState = history.replaceState;
+                            function notifyParent(url) {
+                                try { window.top.postMessage({type:'axure-page', url: url}, '*'); } catch(e) {}
+                            }
+                            history.pushState = function() { _origPushState.apply(this, arguments); notifyParent(location.href); };
+                            history.replaceState = function() { _origReplaceState.apply(this, arguments); notifyParent(location.href); };
+                            window.addEventListener('hashchange', function() { notifyParent(location.href); });
+                        })();
+                    `;
+                    iframeDoc.head.appendChild(script);
+                    console.log('✅ 同源：hashchange + 注入脚本 已绑定');
+                } catch(e) {
+                    console.log('同源检测异常:', e);
+                }
+            }
+
+            // ====== 方案B：postMessage 监听（同源注入脚本会用到）======
+            window.addEventListener('message', function(event) {
+                try {
+                    const data = event.data;
+                    if (!data || typeof data !== 'object') return;
+                    if (data.type === 'axure-page' && data.url) {
+                        const pageName = extractPageNameFromUrl(data.url);
+                        if (pageName) {
+                            console.log('✅ postMessage页面切换:', pageName);
+                            onAxurePageChange(pageName);
+                        }
+                        return;
+                    }
+                    // 也检查字符串消息中是否包含页面信息
+                    let targetUrl = '';
+                    if (typeof data === 'string') {
+                        targetUrl = data;
+                    } else {
+                        const allValues = Object.values(data).map(v => String(v || ''));
+                        for (const val of allValues) {
+                            if (val.includes('&p=') || val.includes('#p=')) {
+                                targetUrl = val;
+                                break;
+                            }
+                        }
+                    }
+                    if (targetUrl && (targetUrl.includes('&p=') || targetUrl.includes('#p='))) {
+                        const pageName = extractPageNameFromUrl(targetUrl);
+                        if (pageName) onAxurePageChange(pageName);
+                    }
+                } catch(e) { /* 忽略 */ }
+            });
+
+            // ====== 方案C：同源时定时检测 hash 变化（兜底）======
+            // 仅在同源模式下使用，检测间隔较长（1秒），性能影响极小
+            if (isSameOrigin) {
+                let lastHash = '';
+                const checkHash = () => {
+                    try {
+                        const hash = axureFrame.contentWindow.location.hash;
+                        if (hash !== lastHash) {
+                            lastHash = hash;
+                            const pageName = extractPageNameFromUrl(axureFrame.contentWindow.location.href);
+                            if (pageName) onAxurePageChange(pageName);
+                        }
+                    } catch(e) { /* 跨域 */ }
+                };
+                // 初始检测
+                checkHash();
+                // 每 1 秒检测一次 hash 变化（仅在 Axure 模式下运行，退出后自动停止）
+                window._axureHashChecker = setInterval(checkHash, 1000);
+                console.log('✅ 同源：hash 轮询已启动（1秒间隔）');
+            }
+
+            // ====== 方案D：从初始 src 提取页面名（初始化用）======
+            const initPage = extractPageNameFromUrl(axureFrame.src);
+            if (initPage) {
+                console.log('从src提取初始页面名:', initPage);
+                onAxurePageChange(initPage);
+            }
+
+            // 提示用户
+            if (!isSameOrigin) {
+                console.log('%c⚠️ 当前为跨域模式，无法自动检测Axure页面切换！', 'color: #f00; font-weight: bold; font-size: 14px;');
+                console.log('%c建议使用代理模式以支持自动页面切换检测', 'color: #f90; font-size: 12px;');
+            }
+        }
+
+        // 更新当前页面显示
+        function updateCurrentPageDisplay() {
+            const currentAxurePageEl = document.getElementById('currentAxurePage');
+            if (currentAxurePageEl) {
+                if (axurePagePath) {
+                    // 如果是标题，直接显示
+                    currentAxurePageEl.textContent = axurePagePath;
+                } else {
+                    currentAxurePageEl.textContent = '未识别';
+                }
+            }
+        }
+        
+        // 更新批注点位置
+        function updateAnnotationPositions(scrollX, scrollY) {
+            const dots = annotationsLayer.querySelectorAll('.annotation-dot');
+            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const arr = annotations[key] || [];
+
+            dots.forEach((dot, index) => {
+                const annotation = arr[index];
+                if (annotation) {
+                    // 原始位置减去滚动偏移量
+                    const displayX = annotation.x - scrollX;
+                    const displayY = annotation.y - scrollY;
+                    dot.style.left = displayX + 'px';
+                    dot.style.top = displayY + 'px';
+                }
+            });
+
+            // 同时更新批注卡片位置
+            if (annotationCard.classList.contains('visible') && currentAnnotation) {
+                const displayX = currentAnnotation.x - scrollX + 20;
+                const displayY = currentAnnotation.y - scrollY - 100;
+                annotationCard.style.left = displayX + 'px';
+                annotationCard.style.top = displayY + 'px';
+            }
+
+            console.log('更新批注位置 scrollX:', scrollX, 'scrollY:', scrollY);
+        }
+
+        // 编辑批注
+        function editAnnotation(annotation) {
+            currentAnnotation = annotation;
+            // 使用显示坐标（不含滚动偏移）
+            const scrollOffset = getIframeScrollOffset();
+            const displayX = annotation.x - scrollOffset.x;
+            const displayY = annotation.y - scrollOffset.y;
+            showAnnotationCard(displayX, displayY, annotation);
+        }
+        
+        // 复制分享链接
+        function copyShareLink() {
+            const shareLinkInput = document.getElementById('shareLink');
+            shareLinkInput.select();
+            document.execCommand('copy');
+            
+            // 更改按钮文字提示成功
+            const copyBtn = document.querySelector('.copy-btn');
+            copyBtn.textContent = '已复制';
+            setTimeout(() => {
+                copyBtn.textContent = '复制';
+            }, 2000);
+        }
+
+        // 渲染批注列表
+        function renderAnnotationsList() {
+            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const arr = annotations[key] || [];
+
+            console.log('渲染批注列表 - 当前页面 key:', key, '批注数量:', arr.length);
+
+            if (arr.length === 0) {
+                annotationsList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-title">暂无批注</div>
+                        <div class="empty-desc">点击原型上的位置添加批注</div>
+                    </div>
+                `;
+                return;
+            }
+
+            annotationsList.innerHTML = arr.map(annotation => {
+                const resolvedCls = annotation.resolved ? ' resolved' : '';
+                const replyCount = (annotation.replies || []).length;
+                const statusBadge = annotation.resolved
+                    ? '<span class="anno-status-badge resolved">✓ 已解决</span>'
+                    : '';
+                const replyBadge = replyCount > 0
+                    ? `<span style="font-size:11px;color:#6B7280;margin-left:4px;">💬 ${replyCount}</span>`
+                    : '';
+                return `
+                <div class="annotation-item${resolvedCls}" onclick="jumpToAnnotation(${annotation.id})">
+                    <div class="annotation-item-header">
+                        <div class="annotation-item-number">${annotation.id}</div>
+                        <div class="annotation-item-title">${annotation.title}${statusBadge}${replyBadge}</div>
+                        <div class="annotation-item-delete" onclick="deleteAnnotationById(event, ${annotation.id})" title="删除">🗑️</div>
+                    </div>
+                    <div class="annotation-item-content">${annotation.content || '暂无内容'}</div>
+                </div>`;
+            }).join('');
+        }
+
+
+        // 通过ID编辑批注
+        function editAnnotationById(id) {
+            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const arr = annotations[key] || [];
+            const annotation = arr.find(a => a.id === id);
+            if (annotation) {
+                editAnnotation(annotation);
+            }
+        }
+
+        // 跳转到批注位置
+        function jumpToAnnotation(id) {
+            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const arr = annotations[key] || [];
+            const annotation = arr.find(a => a.id === id);
+            if (!annotation) return;
+
+            // 显示跳转提示
+            const hint = document.getElementById('annotationJumpHint');
+            hint.style.display = 'flex';
+            setTimeout(() => hint.style.display = 'none', 2000);
+            
+            // 如果是Axure模式，滚动到对应位置
+            if (currentMode === 'axure') {
+                // 计算需要滚动的距离
+                const scrollOffset = getIframeScrollOffset();
+                const targetX = annotation.x - scrollOffset.x;
+                const targetY = annotation.y - scrollOffset.y;
+                
+                // 尝试滚动iframe
+                try {
+                    const iframeWin = axureFrame.contentWindow;
+                    const iframeDoc = axureFrame.contentDocument || iframeWin.document;
+                    
+                    if (iframeWin && iframeDoc) {
+                        iframeWin.scrollTo(targetX, targetY);
+                        // 高亮批注点
+                        setTimeout(() => {
+                            const dot = document.querySelector(`.annotation-dot[data-annotation-id="${id}"]`);
+                            if (dot) {
+                                dot.style.transform = 'translate(-50%, -50%) scale(1.3)';
+                                dot.style.zIndex = '999';
+                                setTimeout(() => {
+                                    dot.style.transform = 'translate(-50%, -50%) scale(1)';
+                                    dot.style.zIndex = '10';
+                                }, 1000);
+                            }
+                        }, 300);
+                    }
+                } catch (e) {
+                    console.log('无法滚动iframe:', e);
+                    alert('无法自动滚动到批注位置（跨域限制）');
+                }
+            } else {
+                // 图片模式：高亮批注点
+                setTimeout(() => {
+                    const dot = document.querySelector(`.annotation-dot[data-annotation-id="${id}"]`);
+                    if (dot) {
+                        dot.style.transform = 'translate(-50%, -50%) scale(1.3)';
+                        dot.style.zIndex = '999';
+                        setTimeout(() => {
+                            dot.style.transform = 'translate(-50%, -50%) scale(1)';
+                            dot.style.zIndex = '10';
+                        }, 1000);
+                    }
+                }, 100);
+            }
+        }
+        
+        // 通过ID删除批注
+        function deleteAnnotationById(event, id) {
+            event.stopPropagation(); // 阻止冒泡，避免触发跳转
+
+            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const arr = annotations[key] || [];
+            const index = arr.findIndex(a => a.id === id);
+
+            if (index > -1) {
+                arr.splice(index, 1);
+                // 重新编号剩余的批注
+                arr.forEach((annotation, idx) => {
+                    annotation.id = idx + 1;
+                });
+                annotations[key] = arr;
+                saveToStorage();
+                renderAnnotations();
+                renderAnnotationsList();
+            }
+        }
+
+        // 上传图片
+        function handleUpload(files) {
+            Array.from(files).forEach((file) => {
+                if (!file.type.startsWith('image/')) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const thumbCanvas = document.createElement('canvas');
+                        const thumbSize = 200;
+                        thumbCanvas.width = thumbSize;
+                        thumbCanvas.height = thumbSize * img.height / img.width;
+                        const ctx = thumbCanvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, thumbCanvas.width, thumbCanvas.height);
+                        
+                        const page = {
+                            name: file.name.replace(/\.[^/.]+$/, '') || `页面 ${pages.length + 1}`,
+                            image: e.target.result,
+                            thumbnail: thumbCanvas.toDataURL(),
+                            width: img.width,
+                            height: img.height
+                        };
+                        
+                        pages.push(page);
+                        saveToStorage();
+                        
+                        if (pages.length === 1) {
+                            switchMode('upload');
+                            switchToPage(0);
+                        }
+                        
+                        renderThumbnails();
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+            
+            closeUploadModal();
+        }
+
+        // 切换到上传模式页面
+        function switchToPage(index) {
+            currentPageIndex = index;
+            const page = pages[index];
+            
+            emptyState.style.display = 'none';
+            canvasContainer.style.display = 'block';
+            canvasContainer.classList.remove('axure-fullscreen');
+            
+            // 清除之前的内容
+            const oldImg = document.getElementById('canvasImage');
+            if (oldImg) oldImg.remove();
+            
+            const oldHTMLFrame = document.getElementById('htmlFrame');
+            if (oldHTMLFrame) oldHTMLFrame.remove();
+            
+            if (page.type === 'html') {
+                // Axure导出的HTML模式
+                let htmlFrame = document.getElementById('htmlFrame');
+                if (!htmlFrame) {
+                    htmlFrame = document.createElement('iframe');
+                    htmlFrame.id = 'htmlFrame';
+                    htmlFrame.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;border:none;';
+                    canvasContainer.insertBefore(htmlFrame, annotationsLayer);
+                }
+                
+                // 加载HTML内容
+                const blob = new Blob([page.html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                htmlFrame.src = url;
+                
+                document.getElementById('axureFrame').style.display = 'none';
+            } else {
+                // 图片模式
+                let img = document.getElementById('canvasImage');
+                if (!img) {
+                    img = document.createElement('img');
+                    img.id = 'canvasImage';
+                    canvasContainer.insertBefore(img, annotationsLayer);
+                }
+                img.src = page.image;
+                img.style.display = 'block';
+                axureFrame.style.display = 'none';
+                
+                img.onload = () => {
+                    canvasContainer.style.width = page.width + 'px';
+                    canvasContainer.style.height = page.height + 'px';
+                    renderAnnotations();
+                };
+            }
+            
+            renderThumbnails();
+            renderAnnotationsList();
+        }
+
+        // 渲染缩略图
+        function renderThumbnails() {
+            const addBtn = `
+                <div class="thumbnail-add" onclick="openUploadModal()">
+                    <div class="add-icon">+</div>
+                    <div>添加页面</div>
+                </div>
+            `;
+            
+            if (pages.length === 0) {
+                thumbnailList.innerHTML = `
+                    <div class="empty-state" style="padding: 20px;">
+                        <div class="empty-title">暂无页面</div>
+                        <div class="empty-desc">上传图片或Axure HTML添加页面</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            pages.forEach((page, index) => {
+                // HTML类型页面使用特殊图标
+                const thumbnail = page.type === 'html' 
+                    ? 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIiB2aWV3Qm94PSIwIDAgMjAwIDIwMCI+PHJlY3Qgd2lkdGg9IjE4MCIgaGVpZ2h0PSIxNDAiIHg9IjEwIiB5PSIzMCIgZmlsbD0iI0U1NUEVEIiByeD0iMTAiLz48Y2lyY2xlIGN4PSIxMDAiIGN5PSI3MCIgcj0iODAiIGZpbGw9IndoaXRlIi8+PHRleHQgeD0iMTAwIiB5PSIxMjAiIGZvbnQtc2l6ZT0iMjgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMzMzMiI+QXh1cmU8L3RleHQ+PC9zdmc+'
+                    : page.thumbnail;
+                
+                html += `
+                    <div class="thumbnail-item ${index === currentPageIndex ? 'active' : ''}" onclick="switchToPage(${index})">
+                        <img src="${thumbnail}" alt="${page.name}">
+                        <div class="thumbnail-name">${page.name}</div>
+                    </div>
+                `;
+            });
+            
+            thumbnailList.innerHTML = html + addBtn;
+        }
+
+        // 切换标签页
+        function switchTab(tab) {
+            document.querySelectorAll('.sidebar-tab').forEach(t => {
+                t.classList.toggle('active', t.textContent.includes(tab === 'pages' ? '页面' : '框架'));
+            });
+        }
+
+        // 模态框
+        function openUploadModal() {
+            uploadModal.classList.add('visible');
+        }
+
+        function closeUploadModal() {
+            uploadModal.classList.remove('visible');
+            document.getElementById('uploadInput').value = '';
+        }
+
+        function openShareModal() {
+            if (!axureConnected && pages.length === 0) {
+                alert('请先连接Axure或上传原型图片');
+                return;
+            }
+            shareModal.classList.add('visible');
+            
+            // 根据当前模式显示不同的分享选项
+            if (currentMode === 'axure') {
+                document.getElementById('shareAxureOptions').style.display = 'block';
+                document.getElementById('shareUploadOptions').style.display = 'none';
+                // 异步加载页面列表
+                loadSharePageList();
+            } else {
+                document.getElementById('shareAxureOptions').style.display = 'none';
+                document.getElementById('shareUploadOptions').style.display = 'block';
+            }
+            document.getElementById('shareProgress').style.display = 'none';
+            document.getElementById('shareLinkBox').style.display = 'none';
+        }
+
+        // 加载分享页面列表
+        function loadSharePageList() {
+            const container = document.getElementById('sharePageList');
+            const countEl = document.getElementById('sharePageCount');
+            container.innerHTML = '<div style="padding: 20px; text-align: center; color: #999; font-size: 13px;">正在读取页面列表...</div>';
+            
+            // 给 Axure 一点时间确保已连接
+            setTimeout(() => {
+                const pageList = getAxurePageList();
+                
+                if (pageList.length === 0) {
+                    container.innerHTML = '<div style="padding: 20px; text-align: center; color: #f59e0b; font-size: 13px;">⚠️ 未能自动读取页面列表<br><span style="font-size:11px;color:#999;margin-top:4px;display:block;">将在导出时截取当前页面。建议先访问所有页面。</span></div>';
+                    countEl.textContent = '';
+                    return;
+                }
+                
+                container.innerHTML = pageList.map((name, i) => {
+                    const hasAnno = annotations[name] && annotations[name].length > 0;
+                    const annoCount = hasAnno ? annotations[name].length : 0;
+                    return `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;border-radius:6px;transition:background 0.1s;" onmouseover="this.style.background='#f5f5f5'" onmouseout="this.style.background=''">
+                        <input type="checkbox" name="sharePage" value="${escHtmlAttr(name)}" checked style="width:14px;height:14px;accent-color:#4F46E5;flex-shrink:0;" onchange="updateSharePageCount()">
+                        <span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtmlAttr(name)}">${escHtmlInline(name)}</span>
+                        ${annoCount > 0 ? `<span style="font-size:11px;background:#fee2e2;color:#ef4444;padding:1px 6px;border-radius:10px;flex-shrink:0;">${annoCount} 条批注</span>` : ''}
+                    </label>`;
+                }).join('');
+                
+                updateSharePageCount();
+            }, 300);
+        }
+
+        function updateSharePageCount() {
+            const checks = document.querySelectorAll('input[name="sharePage"]:checked');
+            const total = document.querySelectorAll('input[name="sharePage"]').length;
+            const countEl = document.getElementById('sharePageCount');
+            if (countEl) countEl.textContent = `已选 ${checks.length} / ${total} 个页面`;
+        }
+
+        function selectAllSharePages(checked) {
+            document.querySelectorAll('input[name="sharePage"]').forEach(cb => cb.checked = checked);
+            updateSharePageCount();
+        }
+
+        // 获取已选中的页面列表
+        function getSelectedSharePages() {
+            const checks = document.querySelectorAll('input[name="sharePage"]:checked');
+            if (checks.length > 0) {
+                return Array.from(checks).map(cb => cb.value);
+            }
+            // 没有勾选框时，回退到 getAxurePageList
+            return getAxurePageList();
+        }
+
+        function escHtmlAttr(s) { return (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+        function escHtmlInline(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+        function closeShareModal() {
+            shareModal.classList.remove('visible');
+            document.getElementById('shareLinkBox').style.display = 'none';
+            document.getElementById('shareProgress').style.display = 'none';
+        }
+        
+        // 导入配置包
+        function importPackage() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        
+                        if (data.version && data.annotations) {
+                            // 导入数据
+                            axureUrl = data.axureUrl || '';
+                            annotations = data.annotations || {};
+                            nextAnnotationId = data.nextAnnotationId || 1;
+                            
+                            // 保存到本地存储
+                            saveToStorage();
+                            
+                            // 更新UI
+                            if (axureUrl) {
+                                document.getElementById('axureUrl').value = axureUrl;
+                                localStorage.setItem('axureUrl', axureUrl);
+                            }
+                            
+                            // 重新渲染
+                            renderAnnotations();
+                            renderAnnotationsList();
+                            
+                            alert(`导入成功！\n\n包含 ${Object.values(annotations).flat().length} 个批注\n${axureUrl ? '已加载Axure地址，点击"连接预览"查看' : '未包含Axure地址'}`);
+                        } else {
+                            alert('无效的配置包文件');
+                        }
+                    } catch (err) {
+                        alert('导入失败：' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        // ========== Axure 分享导出功能 ==========
+        
+        // 获取 Axure 所有页面列表（从 iframe 内部的 sitemap 数据）
+        // 递归展开 Axure sitemap 节点
+        function flattenSitemapNodes(nodes, result) {
+            if (!nodes) return;
+            nodes.forEach(node => {
+                const name = node.pageName || node.label || node.name || '';
+                if (name && !node.children) {
+                    // 叶子节点才是真正可访问的页面
+                    result.push(name);
+                } else if (name && node.children && node.children.length === 0) {
+                    result.push(name);
+                } else if (node.children && node.children.length > 0) {
+                    // 有子节点时，先加自己（如果有name），再递归子节点
+                    if (name) result.push(name);
+                    flattenSitemapNodes(node.children, result);
+                }
+            });
+        }
+
+        function getAxurePageList() {
+            const pageSet = new Set();
+            const ordered = []; // 保持顺序
+
+            function addPage(name) {
+                if (name && !pageSet.has(name)) {
+                    pageSet.add(name);
+                    ordered.push(name);
+                }
+            }
+
+            try {
+                const iframeDoc = axureFrame.contentDocument;
+                const iframeWin = axureFrame.contentWindow;
+
+                // === 方案1：从 $axure.document.sitemap 读取完整树 ===
+                try {
+                    if (iframeWin.$axure && iframeWin.$axure.document && iframeWin.$axure.document.sitemap) {
+                        const sitemap = iframeWin.$axure.document.sitemap;
+                        // Axure 不同版本属性名不同：rootNodes（新版）或 nodes（旧版）
+                        const nodes = sitemap.rootNodes || sitemap.nodes;
+                        if (nodes && nodes.length) {
+                            const names = [];
+                            flattenSitemapNodes(nodes, names);
+                            names.forEach(n => addPage(n));
+                            console.log('从 $axure.document.sitemap 读取到页面:', names.length, names);
+                        }
+                    }
+                } catch(e) { console.warn('sitemap读取失败', e); }
+
+                // === 方案2：从 mainFrame 的 $axure 读取 ===
+                if (ordered.length === 0) {
+                    try {
+                        const mainFrame = iframeDoc.querySelector('#mainFrame');
+                        if (mainFrame && mainFrame.contentWindow && mainFrame.contentWindow.$axure) {
+                            const mfWin = mainFrame.contentWindow;
+                            const sitemap = mfWin.$axure.document && mfWin.$axure.document.sitemap;
+                            if (sitemap) {
+                                const nodes = sitemap.rootNodes || sitemap.nodes;
+                                if (nodes) {
+                                    const names = [];
+                                    flattenSitemapNodes(nodes, names);
+                                    names.forEach(n => addPage(n));
+                                    console.log('从 mainFrame.$axure.sitemap 读取到页面:', names.length);
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+
+                // === 方案3：读取 sitemap 侧边栏的 DOM 链接 ===
+                if (ordered.length === 0) {
+                    try {
+                        // Axure 9/10 左侧面板中的页面链接
+                        const sitemapSelectors = [
+                            '#sitemapFrame', '.sitemapFrame', '#sitemap'
+                        ];
+                        for (const sel of sitemapSelectors) {
+                            const frame = iframeDoc.querySelector(sel);
+                            if (frame && frame.contentDocument) {
+                                const links = frame.contentDocument.querySelectorAll('a[href], [data-p]');
+                                links.forEach(el => {
+                                    const href = el.getAttribute('href') || el.getAttribute('data-p') || '';
+                                    const name = extractPageNameFromUrl(href) || el.textContent.trim();
+                                    if (name) addPage(name);
+                                });
+                                if (ordered.length > 0) break;
+                            }
+                        }
+                    } catch(e) {}
+                }
+
+                // === 方案4：扫描 iframeDoc 里的所有页面链接 ===
+                if (ordered.length === 0) {
+                    try {
+                        const allLinks = iframeDoc.querySelectorAll('a[href*="#p="], a[href*="#id="]');
+                        allLinks.forEach(a => {
+                            const name = extractPageNameFromUrl(a.getAttribute('href') || '');
+                            if (name) addPage(name);
+                        });
+                    } catch(e) {}
+                }
+
+            } catch(e) {
+                console.warn('跨域，无法读取iframe内部内容');
+            }
+
+            // === 兜底：从批注 keys 补充 ===
+            Object.keys(annotations).forEach(key => {
+                const skip = ['axure', 'default', 'start'];
+                if (!skip.includes(key) && !key.startsWith('/')) addPage(key);
+            });
+
+            // 当前正在查看的页面也加进去
+            if (axurePagePath) addPage(axurePagePath);
+
+            console.log('最终页面列表:', ordered);
+            return ordered;
+        }
+        
+        // 截取 Axure 指定页面的截图
+        function captureAxurePage(pageName) {
+            return new Promise(async (resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('截图超时(15秒)')), 15000);
+                try {
+                    const iframeWin = axureFrame.contentWindow;
+                    const iframeDoc = axureFrame.contentDocument;
+                    
+                    if (!iframeWin || !iframeDoc) {
+                        clearTimeout(timeout);
+                        reject(new Error('无法访问 Axure iframe'));
+                        return;
+                    }
+                    
+                    // 切换到目标页面
+                    const targetHash = '#id=' + encodeURIComponent(pageName) + '&p=' + encodeURIComponent(pageName);
+                    if (iframeWin.location.hash !== targetHash) {
+                        iframeWin.location.hash = targetHash;
+                        await new Promise((res) => setTimeout(res, 2000));
+                    }
+                    
+                    // 找到实际渲染页面的 document
+                    let targetDoc = null;
+                    let targetWin = null;
+                    let pageContent = null;
+                    
+                    const mainFrame = iframeDoc.querySelector('#mainFrame');
+                    if (mainFrame && mainFrame.contentDocument) {
+                        targetDoc = mainFrame.contentDocument;
+                        targetWin = mainFrame.contentWindow;
+                        const base = targetDoc.querySelector('#base');
+                        if (base && base.getBoundingClientRect().width > 0) {
+                            pageContent = base;
+                        } else {
+                            pageContent = targetDoc.body;
+                        }
+                        console.log('截图：找到 mainFrame, 目标:', pageContent.tagName);
+                    }
+                    
+                    if (!pageContent || !pageContent.children.length) {
+                        targetDoc = iframeDoc;
+                        targetWin = iframeWin;
+                        pageContent = targetDoc.body;
+                        console.log('截图：使用 iframeDoc body');
+                    }
+                    
+                    if (!pageContent) {
+                        clearTimeout(timeout);
+                        reject(new Error('无法找到页面内容'));
+                        return;
+                    }
+                    
+                    // 加载 html-to-image 库
+                    if (!targetWin.htmlToImageLoaded) {
+                        const script = targetDoc.createElement('script');
+                        script.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.umd.js';
+                        targetDoc.head.appendChild(script);
+                        await new Promise((res, rej) => {
+                            script.onload = () => { targetWin.htmlToImageLoaded = true; res(); };
+                            script.onerror = () => rej(new Error('无法加载截图库，请检查网络'));
+                        });
+                    }
+                    
+                    // 获取页面真实尺寸
+                    const rect = pageContent.getBoundingClientRect();
+                    let width = Math.max(pageContent.scrollWidth, rect.width, 800);
+                    let height = Math.max(pageContent.scrollHeight, rect.height, 600);
+                    const MAX_DIM = 4096;
+                    if (width > MAX_DIM) width = MAX_DIM;
+                    if (height > MAX_DIM) height = MAX_DIM;
+                    
+                    console.log('截图尺寸:', width, 'x', height, '页面:', pageName);
+                    
+                    let dataUrl = null;
+                    var filterFn = function(el) {
+                        if (el.id && (el.id === 'sitemapTreeContainer' || el.id === 'interfaceControlFrame' || el.id === 'footerContainer')) return false;
+                        return true;
+                    };
+                    
+                    // 方案A：html-to-image toPng
+                    try {
+                        dataUrl = await Promise.race([
+                            targetWin.htmlToImage.toPng(pageContent, {
+                                width: width, height: height,
+                                style: { transform: 'none', transformOrigin: 'top left' },
+                                filter: filterFn, pixelRatio: 1,
+                                backgroundColor: '#ffffff', cacheBust: true
+                            }),
+                            new Promise(function(_, rej) { setTimeout(function() { rej(new Error('toPng 超时')); }, 10000); })
+                        ]);
+                        console.log('截图成功(toPng):', pageName, dataUrl.length, 'bytes');
+                    } catch(e1) {
+                        console.warn('toPng 失败，尝试 toSvg:', e1.message);
+                        
+                        // 方案B：toSvg -> Canvas -> PNG
+                        try {
+                            var svgData = await Promise.race([
+                                targetWin.htmlToImage.toSvg(pageContent, {
+                                    width: width, height: height,
+                                    style: { transform: 'none', transformOrigin: 'top left' },
+                                    filter: filterFn,
+                                    backgroundColor: '#ffffff', cacheBust: true
+                                }),
+                                new Promise(function(_, rej) { setTimeout(function() { rej(new Error('toSvg 超时')); }, 8000); })
+                            ]);
+                            var svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                            var svgUrl = URL.createObjectURL(svgBlob);
+                            var img = await new Promise(function(res, rej) {
+                                var i = new Image();
+                                i.onload = function() { res(i); };
+                                i.onerror = function() { rej(new Error('SVG->Image 失败')); };
+                                i.src = svgUrl;
+                            });
+                            var cvs = targetDoc.createElement('canvas');
+                            cvs.width = width;
+                            cvs.height = height;
+                            var ctx = cvs.getContext('2d');
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillRect(0, 0, width, height);
+                            ctx.drawImage(img, 0, 0, width, height);
+                            URL.revokeObjectURL(svgUrl);
+                            dataUrl = cvs.toDataURL('image/png', 0.85);
+                            console.log('截图成功(toSvg):', pageName, dataUrl.length, 'bytes');
+                        } catch(e2) {
+                            console.warn('toSvg 也失败，尝试视口截图:', e2.message);
+                            
+                            // 方案C：只截取可见视口
+                            try {
+                                var vpW = Math.min(targetWin.innerWidth || 1280, 1440);
+                                var vpH = Math.min(targetWin.innerHeight || 800, 900);
+                                dataUrl = await Promise.race([
+                                    targetWin.htmlToImage.toPng(pageContent, {
+                                        width: vpW, height: vpH,
+                                        windowWidth: vpW, windowHeight: vpH,
+                                        style: { transform: 'none', transformOrigin: 'top left' },
+                                        pixelRatio: 1,
+                                        backgroundColor: '#ffffff', cacheBust: true
+                                    }),
+                                    new Promise(function(_, rej) { setTimeout(function() { rej(new Error('视口截图超时')); }, 6000); })
+                                ]);
+                                console.log('截图成功(视口):', pageName, dataUrl.length, 'bytes');
+                            } catch(e3) {
+                                console.error('所有截图方案均失败:', e3.message);
+                                clearTimeout(timeout);
+                                reject(new Error('截图失败: ' + e3.message));
+                                return;
+                            }
+                        }
+                    }
+                    
+                    clearTimeout(timeout);
+                    resolve(dataUrl);
+                    
+                } catch(e) {
+                    clearTimeout(timeout);
+                    console.error('截图失败:', pageName, e);
+                    reject(e);
+                }
+            });
+        }
+        
+        // 导出 Axure 分享包（截图 + 批注）
+        async function exportAxureWithScreenshots() {
+            // 获取用户选定的页面（来自页面选择器复选框）
+            const pageList = getSelectedSharePages();
+            
+            if (pageList.length === 0) {
+                alert('没有找到需要分享的页面。\n\n提示：请确保已连接 Axure 并至少选择一个页面。');
+                return;
+            }
+            
+            // 显示进度
+            document.getElementById('shareAxureOptions').style.display = 'none';
+            document.getElementById('shareProgress').style.display = 'block';
+            
+            const screenshots = [];
+            const totalSteps = pageList.length + 1; // +1 for generating HTML
+            
+            for (let i = 0; i < pageList.length; i++) {
+                const pageName = pageList[i];
+                document.getElementById('shareProgressTitle').textContent = `正在截取页面 (${i+1}/${pageList.length})...`;
+                document.getElementById('shareProgressDesc').textContent = pageName;
+                document.getElementById('shareProgressBar').style.width = ((i / totalSteps) * 100) + '%';
+                
+                try {
+                    const screenshot = await captureAxurePage(pageName);
+                    screenshots.push({ name: pageName, image: screenshot });
+                } catch(e) {
+                    console.warn('截图失败:', pageName, e.message);
+                    // 截图失败时记录，但不中断
+                    screenshots.push({ name: pageName, image: null, error: e.message });
+                }
+            }
+            
+            // 生成 HTML
+            document.getElementById('shareProgressTitle').textContent = '正在生成分享文件...';
+            document.getElementById('shareProgressDesc').textContent = '打包截图和批注数据';
+            document.getElementById('shareProgressBar').style.width = '80%';
+            
+            const html = generateShareHTML(screenshots);
+            
+            document.getElementById('shareProgressBar').style.width = '100%';
+            
+            // 下载
+            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const timestamp = new Date().toISOString().slice(0, 10);
+            a.download = `原型分享-${timestamp}.html`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            // 显示完成状态
+            document.getElementById('shareProgressIcon').textContent = '✅';
+            document.getElementById('shareProgressTitle').textContent = '导出完成！';
+            document.getElementById('shareProgressDesc').textContent = `已导出 ${screenshots.length} 个页面，包含 ${Object.values(annotations).flat().length} 个批注`;
+            
+            setTimeout(() => {
+                closeShareModal();
+            }, 2000);
+        }
+        
+        // 仅导出批注文档（不含截图）
+        function exportAxureAnnotationDoc() {
+            const pageList = getSelectedSharePages();
+            
+            if (pageList.length === 0) {
+                alert('没有批注可导出。');
+                return;
+            }
+            
+            const allAnnotations = [];
+            pageList.forEach(pageName => {
+                const annos = annotations[pageName] || [];
+                annos.forEach(a => {
+                    allAnnotations.push({ page: pageName, ...a });
+                });
+            });
+            
+            const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>原型批注文档</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f5f5f5; padding: 32px; }
+        .header { background: white; padding: 20px 24px; border-radius: 12px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header .meta { font-size: 13px; color: #999; margin-top: 4px; }
+        .page-section { background: white; border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .page-name { font-size: 16px; font-weight: 600; color: #1f2937; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+        .anno-item { padding: 12px 16px; background: #fef2f2; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #EF4444; }
+        .anno-title { font-weight: 500; font-size: 14px; }
+        .anno-content { font-size: 13px; color: #6b7280; margin-top: 4px; white-space: pre-wrap; }
+        .empty { text-align: center; padding: 40px; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📐 原型批注文档</h1>
+        <div class="meta">来源：${axureUrl || 'Axure预览'} | 导出时间：${new Date().toLocaleString('zh-CN')} | 共 ${allAnnotations.length} 条批注</div>
+    </div>
+    ${pageList.map(pageName => {
+        const annos = annotations[pageName] || [];
+        return `
+    <div class="page-section">
+        <div class="page-name">${pageName}</div>
+        ${annos.length > 0 ? annos.map(a => `
+        <div class="anno-item">
+            <div class="anno-title">${a.id}. ${a.title}</div>
+            ${a.content ? `<div class="anno-content">${a.content}</div>` : ''}
+        </div>`).join('') : '<div class="empty">暂无批注</div>'}
+    </div>`;
+    }).join('')}
+</body>
+</html>`;
+            
+            const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '批注文档.html';
+            a.click();
+            URL.revokeObjectURL(url);
+            closeShareModal();
+        }
+        
+        // 生成自包含的分享 HTML（截图 + 可协作标注）
+        function generateShareHTML(screenshots) {
+            const timestamp = new Date().toLocaleString('zh-CN');
+            const shareId = 'share_' + Date.now();
+            const initialData = { annotations: JSON.parse(JSON.stringify(annotations)), nextId: nextAnnotationId };
+
+            return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>原型协作 - ${timestamp}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f0f2f5; color: #1a1a1a; }
+
+        /* 头部 */
+        .header { background: #fff; padding: 12px 24px; border-bottom: 1px solid #e0e0e0; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header h1 { font-size: 17px; font-weight: 600; }
+        .header .meta { font-size: 12px; color: #888; }
+        .header-actions { display: flex; gap: 8px; align-items: center; }
+        .btn-sm { padding: 6px 14px; border-radius: 6px; border: 1px solid #d9d9d9; background: #fff; cursor: pointer; font-size: 13px; transition: all 0.15s; display: inline-flex; align-items: center; gap: 4px; }
+        .btn-sm:hover { border-color: #4F46E5; color: #4F46E5; }
+        .btn-sm.primary { background: #4F46E5; color: #fff; border-color: #4F46E5; }
+        .btn-sm.primary:hover { background: #4338CA; }
+        .btn-sm.active { background: #4F46E5; color: #fff; border-color: #4F46E5; }
+        .btn-sm.danger:hover { border-color: #EF4444; color: #EF4444; }
+        
+        /* 过滤器 */
+        .filter-bar { display: flex; align-items: center; gap: 8px; }
+        .filter-btn { padding: 4px 10px; border-radius: 12px; border: 1px solid #e5e7eb; background: #f9fafb; cursor: pointer; font-size: 12px; color: #6b7280; transition: all 0.15s; }
+        .filter-btn.active { background: #4F46E5; color: #fff; border-color: #4F46E5; }
+        .filter-btn.resolved-filter.active { background: #10B981; border-color: #10B981; }
+
+        /* 导航栏 */
+        .nav { display: flex; gap: 4px; flex-wrap: wrap; padding: 10px 24px; background: #fff; border-bottom: 1px solid #e0e0e0; }
+        .nav-btn { padding: 6px 14px; border: 1px solid transparent; border-radius: 6px; background: #f5f5f5; cursor: pointer; font-size: 13px; white-space: nowrap; transition: all 0.15s; }
+        .nav-btn:hover { background: #e8e8e8; }
+        .nav-btn.active { background: #4F46E5; color: #fff; }
+        .nav-btn .badge { display: inline-block; background: #EF4444; color: #fff; font-size: 11px; padding: 1px 6px; border-radius: 10px; margin-left: 4px; }
+        .nav-btn.active .badge { background: rgba(255,255,255,0.3); }
+
+        /* 主内容区 */
+        .main { display: flex; height: calc(100vh - 97px); }
+
+        /* 左侧截图区 */
+        .canvas-area { flex: 1; overflow: auto; position: relative; background: #e8eaed; }
+        .page-view { display: none; position: relative; }
+        .page-view.active { display: block; }
+        .screenshot-wrap { position: relative; display: inline-block; min-width: 100%; }
+        .screenshot-wrap img { display: block; width: 100%; height: auto; }
+        .no-screenshot { text-align: center; padding: 100px 24px; color: #999; }
+        .no-screenshot-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.5; }
+
+        /* 标注模式 */
+        .canvas-area.annotate-mode { cursor: crosshair; }
+        .anno-marker { position: absolute; width: 26px; height: 26px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.25); transition: transform 0.15s, box-shadow 0.15s; z-index: 10; user-select: none; }
+        .anno-marker:hover { transform: translate(-50%, -50%) scale(1.25); box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 11; }
+        .anno-marker.from-author { background: #EF4444; }
+        .anno-marker.from-collab { background: #3B82F6; }
+        .anno-marker.is-resolved { background: #10B981 !important; }
+        .anno-marker.highlight { animation: pulse 0.6s ease; }
+        @keyframes pulse { 0%,100% { transform: translate(-50%,-50%) scale(1); } 50% { transform: translate(-50%,-50%) scale(1.5); } }
+
+        /* 右侧批注面板 */
+        .anno-panel { width: 380px; background: #fff; border-left: 1px solid #e0e0e0; display: flex; flex-direction: column; height: 100%; }
+        .anno-panel-header { padding: 14px 16px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .anno-panel-header h3 { font-size: 15px; font-weight: 600; white-space: nowrap; }
+        .anno-panel-body { flex: 1; overflow-y: auto; padding: 12px; }
+        .anno-panel-empty { text-align: center; padding: 40px 16px; color: #bbb; font-size: 13px; }
+
+        /* 批注卡片 */
+        .anno-card { padding: 12px; border-radius: 8px; margin-bottom: 8px; border-left: 3px solid; cursor: pointer; transition: background 0.15s; }
+        .anno-card:hover { filter: brightness(0.97); }
+        .anno-card.from-author { background: #fef2f2; border-color: #EF4444; }
+        .anno-card.from-collab { background: #eff6ff; border-color: #3B82F6; }
+        .anno-card.is-resolved { background: #f0fdf4; border-color: #10B981; opacity: 0.75; }
+        .anno-card .anno-num { font-weight: 700; font-size: 12px; margin-right: 4px; }
+        .anno-card.from-author .anno-num { color: #EF4444; }
+        .anno-card.from-collab .anno-num { color: #3B82F6; }
+        .anno-card.is-resolved .anno-num { color: #10B981; }
+        .anno-card .anno-title { font-weight: 500; font-size: 14px; display: inline; }
+        .anno-card.is-resolved .anno-title { text-decoration: line-through; color: #9CA3AF; }
+        .anno-card .anno-text { font-size: 13px; color: #666; margin-top: 6px; white-space: pre-wrap; line-height: 1.5; }
+        .anno-card .anno-time { font-size: 11px; color: #aaa; margin-top: 4px; }
+        .anno-card .anno-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; gap: 6px; flex-wrap: wrap; }
+        .anno-card .anno-delete { color: #ccc; cursor: pointer; font-size: 13px; padding: 2px 4px; }
+        .anno-card .anno-delete:hover { color: #EF4444; }
+        .status-badge { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .status-badge.open { background: #fee2e2; color: #dc2626; }
+        .status-badge.resolved { background: #dcfce7; color: #16a34a; }
+        .resolve-btn { padding: 3px 9px; border-radius: 10px; font-size: 11px; font-weight: 500; border: 1px solid; cursor: pointer; background: transparent; transition: all 0.15s; }
+        .resolve-btn.to-resolve { border-color: #10B981; color: #10B981; }
+        .resolve-btn.to-resolve:hover { background: #10B981; color: #fff; }
+        .resolve-btn.to-reopen { border-color: #6B7280; color: #6B7280; }
+        .resolve-btn.to-reopen:hover { background: #6B7280; color: #fff; }
+        .reply-count { font-size: 11px; color: #6B7280; }
+        
+        /* 回复讨论区 */
+        .replies-section { margin-top: 8px; padding-top: 8px; border-top: 1px solid #f0f0f0; }
+        .reply-item { font-size: 12px; padding: 6px 8px; background: #f8fafc; border-radius: 6px; margin-bottom: 4px; border-left: 2px solid #e5e7eb; }
+        .reply-author { font-weight: 600; color: #4F46E5; margin-right: 4px; }
+        .reply-text { color: #374151; }
+        .reply-time { font-size: 11px; color: #9CA3AF; margin-top: 2px; }
+        .mention { color: #4F46E5; font-weight: 500; }
+        .reply-input-wrap { margin-top: 6px; display: flex; gap: 5px; }
+        .reply-input { flex: 1; padding: 5px 8px; border: 1px solid #d9d9d9; border-radius: 5px; font-size: 12px; font-family: inherit; outline: none; }
+        .reply-input:focus { border-color: #4F46E5; }
+        .reply-send { padding: 5px 10px; background: #4F46E5; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; }
+
+        /* 批注编辑弹窗 */
+        .anno-editor-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 200; display: flex; align-items: center; justify-content: center; }
+        .anno-editor { background: #fff; border-radius: 12px; width: 420px; max-width: 92vw; box-shadow: 0 20px 60px rgba(0,0,0,0.2); overflow: hidden; }
+        .anno-editor-header { padding: 14px 20px; border-bottom: 1px solid #f0f0f0; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+        .anno-editor-body { padding: 14px 20px; }
+        .anno-editor-field { margin-bottom: 10px; }
+        .anno-editor-field label { display: block; font-size: 13px; font-weight: 500; color: #555; margin-bottom: 4px; }
+        .anno-editor-field input, .anno-editor-field textarea { width: 100%; padding: 7px 10px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s; }
+        .anno-editor-field input:focus, .anno-editor-field textarea:focus { border-color: #4F46E5; }
+        .anno-editor-field textarea { resize: vertical; min-height: 72px; }
+        .anno-editor-footer { padding: 10px 20px; border-top: 1px solid #f0f0f0; display: flex; justify-content: flex-end; gap: 8px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <h1>&#x1F4D0; 原型协作标注</h1>
+            <span class="meta">${timestamp} &nbsp;|&nbsp; ${screenshots.length} 个页面</span>
+        </div>
+        <div class="header-actions">
+            <div class="filter-bar">
+                <span style="font-size:12px;color:#999;">筛选：</span>
+                <button class="filter-btn active" id="filterAll" onclick="setFilter('all')">全部</button>
+                <button class="filter-btn" id="filterOpen" onclick="setFilter('open')">待解决</button>
+                <button class="filter-btn resolved-filter" id="filterResolved" onclick="setFilter('resolved')">已解决</button>
+            </div>
+            <button class="btn-sm" id="btnAnnotate" onclick="toggleAnnotateMode()">&#x1F4CC; 标注</button>
+            <button class="btn-sm" onclick="exportAnnotations()">&#x1F4E4; 导出</button>
+        </div>
+    </div>
+    <div class="nav" id="pageNav"></div>
+    <div class="main">
+        <div class="canvas-area" id="canvasArea">
+            ${screenshots.map((s, i) => s.image ? `
+            <div class="page-view${i === 0 ? ' active' : ''}" id="page-${i}" data-page="${i}">
+                <div class="screenshot-wrap" id="screenshot-${i}">
+                    <img src="${s.image}" alt="${s.name}">
+                </div>
+            </div>` : `
+            <div class="page-view${i === 0 ? ' active' : ''}" id="page-${i}" data-page="${i}">
+                <div class="screenshot-wrap" id="screenshot-${i}" style="min-height:500px;background:#f8f9fa;display:flex;align-items:center;justify-content:center;">
+                    <div class="no-screenshot">
+                        <div class="no-screenshot-icon">&#x1F4F7;</div>
+                        <div style="font-size:14px;color:#666;">截图失败：${s.error || '未知错误'}</div>
+                        <div style="font-size:12px;color:#bbb;margin-top:8px;">仍可在标注模式下点击此区域添加批注</div>
+                    </div>
+                </div>
+            </div>`).join('')}
+        </div>
+        <div class="anno-panel">
+            <div class="anno-panel-header">
+                <h3>&#x1F4DD; 批注 <span id="annoTotalCount">0</span></h3>
+            </div>
+            <div class="anno-panel-body" id="annoList">
+                <div class="anno-panel-empty" id="annoEmpty">
+                    暂无批注<br><span style="font-size:12px;margin-top:4px;display:inline-block;">点击顶部「标注」按钮后，点击截图添加</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 批注编辑弹窗 -->
+    <div class="anno-editor-overlay" id="annoEditorOverlay" style="display:none;" onclick="if(event.target===this)cancelEdit()">
+        <div class="anno-editor">
+            <div class="anno-editor-header">&#x1F4CC; <span id="editorTitle">新建批注</span></div>
+            <div class="anno-editor-body">
+                <div class="anno-editor-field">
+                    <label>标题</label>
+                    <input type="text" id="editorFieldTitle" placeholder="输入批注标题" maxlength="50">
+                </div>
+                <div class="anno-editor-field">
+                    <label>说明 <span style="font-size:11px;color:#aaa;">支持 @名字 提及</span></label>
+                    <textarea id="editorFieldContent" placeholder="输入详细说明（可选）&#10;@名字 可提及成员"></textarea>
+                </div>
+                <div class="anno-editor-field">
+                    <label>你的名字</label>
+                    <input type="text" id="editorFieldName" placeholder="用于区分不同人的批注">
+                </div>
+            </div>
+            <div class="anno-editor-footer">
+                <button class="btn-sm" onclick="cancelEdit()">取消</button>
+                <button class="btn-sm primary" onclick="saveEdit()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <` + 'script' + `>
+    (function() {
+        const STORAGE_KEY = '${shareId}';
+        const PAGE_NAMES = ${JSON.stringify(screenshots.map(s => s.name))};
+        const INITIAL_DATA = ${JSON.stringify(initialData)};
+
+        let annotations = {};
+        let nextId = INITIAL_DATA.nextId;
+        let currentPage = 0;
+        let annotateMode = false;
+        let editingAnno = null;
+        let currentFilter = 'all'; // all | open | resolved
+
+        // ---- 数据持久化 ----
+        function load() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const d = JSON.parse(saved);
+                    annotations = d.annotations || {};
+                    nextId = d.nextId || INITIAL_DATA.nextId;
+                } else {
+                    annotations = INITIAL_DATA.annotations;
+                    nextId = INITIAL_DATA.nextId;
+                }
+            } catch(e) {
+                annotations = INITIAL_DATA.annotations;
+                nextId = INITIAL_DATA.nextId;
+            }
+        }
+
+        function save() {
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ annotations, nextId })); } catch(e) {}
+        }
+
+        function getPageName(idx) { return PAGE_NAMES[idx] || ('page-' + idx); }
+
+        // ---- 初始化 ----
+        load();
+        renderNav();
+        renderAllMarkers();
+        renderAnnoList();
+
+        // ---- 筛选 ----
+        window.setFilter = function(f) {
+            currentFilter = f;
+            ['all','open','resolved'].forEach(id => {
+                const btn = document.getElementById('filter' + id.charAt(0).toUpperCase() + id.slice(1));
+                if (btn) btn.classList.toggle('active', id === f);
+            });
+            renderAnnoList();
+            renderAllMarkers();
+        };
+
+        // ---- 导航 ----
+        function renderNav() {
+            const nav = document.getElementById('pageNav');
+            nav.innerHTML = PAGE_NAMES.map((name, i) => {
+                const annos = (annotations[name] || []).filter(a => a);
+                const openCount = annos.filter(a => !a.resolved).length;
+                return '<button class="nav-btn' + (i === currentPage ? ' active' : '') + '" onclick="switchPage(' + i + ')">' +
+                    escHtml(name) + (openCount > 0 ? '<span class="badge">' + openCount + '</span>' : '') + '</button>';
+            }).join('');
+        }
+
+        window.switchPage = function(idx) {
+            currentPage = idx;
+            document.querySelectorAll('.page-view').forEach((el, i) => el.classList.toggle('active', i === idx));
+            document.querySelectorAll('.nav-btn').forEach((el, i) => el.classList.toggle('active', i === idx));
+            renderAnnoList();
+        };
+
+        // ---- 标注模式 ----
+        window.toggleAnnotateMode = function() {
+            annotateMode = !annotateMode;
+            const area = document.getElementById('canvasArea');
+            const btn = document.getElementById('btnAnnotate');
+            area.classList.toggle('annotate-mode', annotateMode);
+            btn.classList.toggle('active', annotateMode);
+            btn.textContent = annotateMode ? '\\u2714 \\u5B8C\\u6210\\u6807\\u6CE8' : '\\u{1F4CC} \\u6807\\u6CE8';
+        };
+
+        document.getElementById('canvasArea').addEventListener('click', function(e) {
+            if (!annotateMode) return;
+            const pageView = e.target.closest('.page-view');
+            if (!pageView) return;
+            const wrap = pageView.querySelector('.screenshot-wrap') || pageView;
+            if (e.target.closest('.anno-marker')) return;
+
+            const rect = wrap.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const pageIdx = parseInt(pageView.dataset.page);
+
+            openEditor(pageIdx, null, x, y);
+        });
+
+        // ---- 标记渲染 ----
+        function renderAllMarkers() {
+            PAGE_NAMES.forEach((name, idx) => {
+                const wrap = document.getElementById('screenshot-' + idx);
+                if (!wrap) return;
+                wrap.querySelectorAll('.anno-marker').forEach(el => el.remove());
+
+                const annos = (annotations[name] || []).filter(a => a);
+                annos.forEach(a => {
+                    // 按过滤器隐藏
+                    if (currentFilter === 'open' && a.resolved) return;
+                    if (currentFilter === 'resolved' && !a.resolved) return;
+
+                    const marker = document.createElement('div');
+                    const cls = a.resolved ? 'is-resolved' : (a.isAuthor ? 'from-author' : 'from-collab');
+                    marker.className = 'anno-marker ' + cls;
+                    marker.style.left = a.x + 'px';
+                    marker.style.top = a.y + 'px';
+                    marker.textContent = a.resolved ? '\\u2713' : a.id;
+                    marker.title = a.title;
+                    marker.onclick = function(ev) { ev.stopPropagation(); showAnnoDetail(idx, a.id); };
+                    marker.dataset.pageIdx = idx;
+                    marker.dataset.annoId = a.id;
+                    wrap.appendChild(marker);
+                });
+            });
+        }
+
+        function highlightMarker(pageIdx, annoId) {
+            const wrap = document.getElementById('screenshot-' + pageIdx);
+            if (!wrap) return;
+            const marker = wrap.querySelector('.anno-marker[data-anno-id="' + annoId + '"]');
+            if (marker) {
+                marker.classList.add('highlight');
+                setTimeout(() => marker.classList.remove('highlight'), 600);
+                marker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // ---- 批注列表 ----
+        function renderAnnoList() {
+            const name = getPageName(currentPage);
+            let annos = (annotations[name] || []).filter(a => a);
+
+            // 按过滤器筛选
+            if (currentFilter === 'open') annos = annos.filter(a => !a.resolved);
+            if (currentFilter === 'resolved') annos = annos.filter(a => a.resolved);
+
+            const list = document.getElementById('annoList');
+            const allAnnos = Object.values(annotations).flat().filter(a => a);
+            const total = currentFilter === 'all' ? allAnnos.length
+                : currentFilter === 'open' ? allAnnos.filter(a => !a.resolved).length
+                : allAnnos.filter(a => a.resolved).length;
+            document.getElementById('annoTotalCount').textContent = total;
+
+            if (annos.length === 0) {
+                list.innerHTML = '<div class="anno-panel-empty">\\u6682\\u65E0\\u6279\\u6CE8</div>';
+                return;
+            }
+
+            list.innerHTML = annos.map(a => {
+                const cls = a.resolved ? 'is-resolved' : (a.isAuthor ? 'from-author' : 'from-collab');
+                const statusBadge = a.resolved
+                    ? '<span class="status-badge resolved">\\u2713 \\u5DF2\\u89E3\\u51B3</span>'
+                    : '<span class="status-badge open">\\u25CF \\u5F85\\u89E3\\u51B3</span>';
+                const resolveBtnText = a.resolved ? '\\u91CD\\u65B0\\u5F00\\u542F' : '\\u6807\\u8BB0\\u5DF2\\u89E3\\u51B3';
+                const resolveBtnCls = a.resolved ? 'to-reopen' : 'to-resolve';
+                const replies = a.replies || [];
+                const replyHtml = replies.length > 0
+                    ? '<div class="replies-section">' + replies.map(function(r) {
+                        return '<div class="reply-item">'
+                            + '<span class="reply-author">' + escHtml(r.author || '\\u533F\\u540D') + '</span>'
+                            + '<span class="reply-text">' + renderMentions(escHtml(r.text || '')) + '</span>'
+                            + '<div class="reply-time">' + escHtml(r.time || '') + '</div>'
+                            + '</div>';
+                    }).join('') + '</div>'
+                    : '';
+                return '<div id="anno-card-' + a.id + '" class="anno-card ' + cls + '" onclick="handleCardClick(event,' + currentPage + ',' + a.id + ')">' +
+                    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;">' +
+                        '<div style="flex:1;min-width:0;">' +
+                            '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">' +
+                                '<span class="anno-num">#' + a.id + '</span>' +
+                                '<span class="anno-title">' + escHtml(a.title) + '</span>' +
+                                statusBadge +
+                            '</div>' +
+                            (a.content ? '<div class="anno-text">' + renderMentions(escHtml(a.content)) + '</div>' : '') +
+                            (a.author ? '<div class="anno-time">@' + escHtml(a.author) + (a.time ? ' &nbsp;' + escHtml(a.time) : '') + '</div>' : '') +
+                        '</div>' +
+                        '<span class="anno-delete" onclick="event.stopPropagation();deleteAnno(' + currentPage + ',' + a.id + ')" title="\\u5220\\u9664">\\u2715</span>' +
+                    '</div>' +
+                    '<div class="anno-footer">' +
+                        '<button class="resolve-btn ' + resolveBtnCls + '" onclick="event.stopPropagation();toggleResolve(' + currentPage + ',' + a.id + ')">' + resolveBtnText + '</button>' +
+                        '<button class="btn-sm" style="font-size:11px;padding:3px 8px;" onclick="event.stopPropagation();toggleReplyInput(' + a.id + ')">\\u{1F4AC} ' + (replies.length > 0 ? replies.length + ' \\u6761\\u56DE\\u590D' : '\\u56DE\\u590D') + '</button>' +
+                    '</div>' +
+                    replyHtml +
+                    '<div class="reply-input-wrap" id="reply-wrap-' + a.id + '" style="display:none;">' +
+                        '<input class="reply-input" id="reply-input-' + a.id + '" placeholder="\\u56DE\\u590D... \\u652F\\u6301 @\\u540D\\u5B57" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendReply(' + currentPage + ',' + a.id + ');}">' +
+                        '<button class="reply-send" onclick="event.stopPropagation();sendReply(' + currentPage + ',' + a.id + ')">\\u53D1\\u9001</button>' +
+                    '</div>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function escHtml(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+        function renderMentions(s) { return s.replace(/@(\\S+)/g, '<span class="mention">@$1</span>'); }
+
+        window.handleCardClick = function(e, pageIdx, annoId) {
+            if (e.target.closest('.resolve-btn') || e.target.closest('.btn-sm') || e.target.closest('.anno-delete') || e.target.closest('.reply-input-wrap')) return;
+            highlightMarker(pageIdx, annoId);
+        };
+
+        // ---- 回复 ----
+        window.toggleReplyInput = function(annoId) {
+            const wrap = document.getElementById('reply-wrap-' + annoId);
+            if (!wrap) return;
+            const visible = wrap.style.display !== 'none';
+            wrap.style.display = visible ? 'none' : 'flex';
+            if (!visible) document.getElementById('reply-input-' + annoId).focus();
+        };
+
+        window.sendReply = function(pageIdx, annoId) {
+            const input = document.getElementById('reply-input-' + annoId);
+            if (!input) return;
+            const text = input.value.trim();
+            if (!text) return;
+
+            const name = getPageName(pageIdx);
+            const anno = (annotations[name] || []).find(a => a && a.id === annoId);
+            if (!anno) return;
+
+            if (!anno.replies) anno.replies = [];
+            const author = localStorage.getItem(STORAGE_KEY + '_lastAuthor') || '\\u5354\\u4F5C\\u8005';
+            anno.replies.push({ author, text, time: new Date().toLocaleString('zh-CN') });
+            input.value = '';
+            save();
+            renderAnnoList();
+            renderAllMarkers();
+            renderNav();
+        };
+
+        // ---- 解决状态切换 ----
+        window.toggleResolve = function(pageIdx, annoId) {
+            const name = getPageName(pageIdx);
+            const anno = (annotations[name] || []).find(a => a && a.id === annoId);
+            if (!anno) return;
+            anno.resolved = !anno.resolved;
+            save();
+            renderAnnoList();
+            renderAllMarkers();
+            renderNav();
+        };
+
+        // ---- 编辑器 ----
+        function openEditor(pageIdx, annoId, x, y) {
+            editingAnno = { pageIdx, annoId, x, y };
+            const overlay = document.getElementById('annoEditorOverlay');
+            overlay.style.display = 'flex';
+
+            if (annoId) {
+                const name = getPageName(pageIdx);
+                const anno = (annotations[name] || []).find(a => a && a.id === annoId);
+                if (anno) {
+                    document.getElementById('editorTitle').textContent = '\\u7F16\\u8F91\\u6279\\u6CE8 #' + annoId;
+                    document.getElementById('editorFieldTitle').value = anno.title || '';
+                    document.getElementById('editorFieldContent').value = anno.content || '';
+                    document.getElementById('editorFieldName').value = anno.author || '';
+                }
+            } else {
+                document.getElementById('editorTitle').textContent = '\\u65B0\\u5EFA\\u6279\\u6CE8';
+                document.getElementById('editorFieldTitle').value = '';
+                document.getElementById('editorFieldContent').value = '';
+                document.getElementById('editorFieldName').value = localStorage.getItem(STORAGE_KEY + '_lastAuthor') || '';
+            }
+
+            setTimeout(() => document.getElementById('editorFieldTitle').focus(), 80);
+        }
+
+        window.showAnnoDetail = function(pageIdx, annoId) {
+            openEditor(pageIdx, annoId, null, null);
+        };
+
+        window.cancelEdit = function() {
+            document.getElementById('annoEditorOverlay').style.display = 'none';
+            editingAnno = null;
+        };
+
+        window.saveEdit = function() {
+            if (!editingAnno) return;
+            const title = document.getElementById('editorFieldTitle').value.trim();
+            if (!title) { alert('\\u8BF7\\u8F93\\u5165\\u6807\\u9898'); return; }
+
+            const content = document.getElementById('editorFieldContent').value.trim();
+            const author = document.getElementById('editorFieldName').value.trim();
+            if (author) localStorage.setItem(STORAGE_KEY + '_lastAuthor', author);
+
+            const name = getPageName(editingAnno.pageIdx);
+            if (!annotations[name]) annotations[name] = [];
+
+            if (editingAnno.annoId) {
+                const anno = annotations[name].find(a => a && a.id === editingAnno.annoId);
+                if (anno) {
+                    anno.title = title;
+                    anno.content = content;
+                    if (author) anno.author = author;
+                    anno.time = new Date().toLocaleString('zh-CN');
+                }
+            } else {
+                const id = nextId++;
+                annotations[name].push({
+                    id, x: editingAnno.x, y: editingAnno.y,
+                    title, content,
+                    author: author || '\\u5354\\u4F5C\\u8005',
+                    isAuthor: false,
+                    resolved: false,
+                    replies: [],
+                    time: new Date().toLocaleString('zh-CN')
+                });
+            }
+
+            save();
+            renderAllMarkers();
+            renderAnnoList();
+            renderNav();
+            cancelEdit();
+        };
+
+        window.deleteAnno = function(pageIdx, annoId) {
+            if (!confirm('\\u786E\\u5B9A\\u5220\\u9664\\u8FD9\\u6761\\u6279\\u6CE8\\uFF1F')) return;
+            const name = getPageName(pageIdx);
+            if (annotations[name]) {
+                annotations[name] = annotations[name].filter(a => !a || a.id !== annoId);
+            }
+            save();
+            renderAllMarkers();
+            renderAnnoList();
+            renderNav();
+        };
+
+        window.exportAnnotations = function() {
+            let text = '\\u539F\\u578B\\u534F\\u4F5C\\u6279\\u6CE8\\u5BFC\\u51FA\\n';
+            text += '\\u5BFC\\u51FA\\u65F6\\u95F4\\uFF1A' + new Date().toLocaleString('zh-CN') + '\\n';
+            text += '='.repeat(60) + '\\n\\n';
+
+            PAGE_NAMES.forEach(name => {
+                const annos = (annotations[name] || []).filter(a => a);
+                if (annos.length === 0) return;
+                text += '\\u3010' + name + '\\u3011\\n';
+                annos.forEach(a => {
+                    text += '  #' + a.id + ' ' + a.title + (a.resolved ? ' [\\u5DF2\\u89E3\\u51B3]' : '') + '\\n';
+                    if (a.author) text += '  @' + a.author + '\\n';
+                    if (a.content) text += '  ' + a.content + '\\n';
+                    if (a.replies && a.replies.length > 0) {
+                        text += '  \\u56DE\\u590D:\\n';
+                        a.replies.forEach(r => text += '    ' + r.author + ': ' + r.text + '\\n');
+                    }
+                    if (a.time) text += '  ' + a.time + '\\n';
+                    text += '\\n';
+                });
+            });
+
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '\\u539F\\u578B\\u6279\\u6CE8-' + new Date().toISOString().slice(0,10) + '.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+    })();
+    <` + '/script' + `>
+</body>
+</html>`;
+        }
+        
+        // 保存为独立版本
+        function saveAsStandalone() {
+            if (!axureConnected) {
+                alert('请先连接Axure');
+                return;
+            }
+            
+            // 准备要嵌入的数据
+            const newData = {
+                pages,
+                annotations,
+                nextAnnotationId,
+                axureUrl: axureUrl
+            };
+            
+            // 创建新的HTML内容（不依赖fetch）
+            const htmlContent = generateStandaloneHTML(newData);
+            
+            // 下载新文件
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const filename = 'prototype-viewer-with-data.html';
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            alert(`保存成功！\n\n文件名：${filename}\n\n特点：\n✓ 已包含 Axure 地址\n✓ 已包含所有批注\n✓ 发送给他人后，打开即可自动连接预览\n\n请将此文件发送给他人`);
+        }
+        
+        // 生成独立HTML文件内容
+        function generateStandaloneHTML(data) {
+            // 获取当前页面的完整HTML（通过document.documentElement.outerHTML）
+            let html = document.documentElement.outerHTML;
+            
+            // 注入预加载数据脚本
+            const preloadScript = `
+    <` + 'script' + `>
+        // 预加载数据 - 从此处开始
+        window.preloadedData = ${JSON.stringify(data)};
+        // 预加载数据 - 到此结束
+    <\/script>
+`;
+            
+            // 在 </head> 前插入预加载脚本
+            html = html.replace('</head>', preloadScript + '</head>');
+            
+            // 修改 init 函数，让它先检查预加载数据
+            const originalInit = 'function init() {';
+            const modifiedInit = `function init() {
+        // 检查是否有预加载数据
+        if (window.preloadedData) {
+            const data = window.preloadedData;
+            pages = data.pages || [];
+            annotations = data.annotations || {};
+            nextAnnotationId = data.nextAnnotationId || 1;
+            axureUrl = data.axureUrl || '';
+            
+            // 自动填充URL并连接
+            if (axureUrl) {
+                document.getElementById('axureUrl').value = axureUrl;
+                setTimeout(() => connectAxure(), 500);
+            }
+            return; // 跳过后续的本地存储加载
+        }
+`;
+            
+            html = html.replace(originalInit, modifiedInit);
+            
+            return html;
+        }
+
+        // 导出HTML
+        function exportHTML() {
+            if (currentMode === 'axure') {
+                // Axure模式：导出当前页面的截图或iframe的HTML
+                alert('Axure模式导出正在开发中。\n\n提示：您可以使用浏览器的截图功能保存当前页面。');
+                return;
+            }
+            
+            // 上传模式：导出包含图片的HTML
+            const html = generateExportHTML();
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'prototype-with-annotations.html';
+            a.click();
+            URL.revokeObjectURL(url);
+            closeShareModal();
+        }
+
+        // 导出带标记图片
+        function exportWithImages() {
+            const html = generateImageExportHTML();
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'prototype-with-markers.html';
+            a.click();
+            URL.revokeObjectURL(url);
+            closeShareModal();
+        }
+        
+        // 导出完整包（含Axure地址和批注）
+        function exportFullPackage() {
+            if (currentMode === 'axure' && !axureUrl) {
+                alert('请先连接Axure并输入地址');
+                return;
+            }
+            
+            const packageData = {
+                version: '1.0',
+                exportDate: new Date().toISOString(),
+                axureUrl: axureUrl || '',
+                mode: currentMode,
+                annotations: annotations,
+                nextAnnotationId: nextAnnotationId
+            };
+            
+            const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(packageData, null, 2));
+            
+            // 生成导入说明
+            const instruction = `
+📦 原型查看器 - 完整包
+
+包含内容：
+✓ Axure 地址：${axureUrl || '未设置'}
+✓ 批注数量：${Object.values(annotations).flat().length} 个
+✓ 导出时间：${new Date().toLocaleString('zh-CN')}
+
+使用方法：
+1. 将此文件保存为：prototype-package.json
+2. 发送给接收方
+3. 接收方打开 prototype-viewer.html
+4. 点击"导入配置包"，选择此JSON文件
+5. 自动加载Axure地址和批注
+
+---
+包内容（可复制）：
+${JSON.stringify(packageData, null, 2)}
+            `.trim();
+            
+            document.getElementById('shareLink').value = instruction;
+            document.getElementById('shareLinkBox').style.display = 'block';
+            
+            // 可选：同时下载JSON文件
+            const blob = new Blob([JSON.stringify(packageData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'prototype-package.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // 生成导出HTML
+        function generateExportHTML() {
+            // 如果是Axure模式，只导出批注列表
+            if (currentMode === 'axure') {
+                return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>原型批注文档</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: #f5f5f5; }
+        .header { background: white; padding: 16px 24px; border-bottom: 1px solid #e5e7eb; }
+        .logo { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 18px; }
+        .content { padding: 24px; }
+        .annotation { padding: 12px; background: #fef2f2; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #EF4444; }
+        .annotation-title { font-weight: 500; }
+        .annotation-content { font-size: 13px; color: #6b7280; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">📐 原型批注文档</div>
+    </header>
+    <div class="content">
+        <p style="color: #666; margin-bottom: 20px;">来源: ${axureUrl || 'Axure预览'}</p>
+        ${(annotations['axure'] || []).map(a => `
+        <div class="annotation">
+            <div class="annotation-title">${a.id}. ${a.title}</div>
+            <div class="annotation-content">${a.content || '暂无说明'}</div>
+        </div>
+        `).join('')}
+        ${(annotations['axure'] || []).length === 0 ? '<p style="color: #999;">暂无批注</p>' : ''}
+    </div>
+</body>
+</html>`;
+            }
+            
+            // 上传模式：导出包含图片的完整HTML
+            return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>原型批注文档</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, sans-serif; background: #f5f5f5; }
+        .header { background: white; padding: 16px 24px; border-bottom: 1px solid #e5e7eb; }
+        .logo { display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 18px; }
+        .content { padding: 24px; }
+        .page { background: white; border-radius: 12px; padding: 24px; margin-bottom: 32px; }
+        .page-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+        .page-image-container { position: relative; display: inline-block; }
+        .page-image { max-width: 100%; display: block; }
+        .annotation-marker { position: absolute; width: 28px; height: 28px; background: #EF4444; border-radius: 50%; color: white; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); }
+        .annotations-list { margin-top: 20px; }
+        .annotation-item { padding: 12px; background: #fef2f2; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #EF4444; }
+        .annotation-item-title { font-weight: 500; }
+        .annotation-item-content { font-size: 13px; color: #6b7280; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="logo">📐 原型批注文档</div>
+    </header>
+    <div class="content">
+        ${pages.map((page, idx) => {
+            const pageAnnos = annotations[idx] || [];
+            return `
+        <div class="page">
+            <div class="page-title">${page.name}</div>
+            <div class="page-image-container">
+                <img src="${page.image}" class="page-image" alt="${page.name}">
+                ${pageAnnos.map(a => `<div class="annotation-marker" style="left: ${a.x}px; top: ${a.y}px;">${a.id}</div>`).join('')}
+            </div>
+            ${pageAnnos.length > 0 ? `
+            <div class="annotations-list">
+                <h3 style="margin-bottom: 12px; font-size: 14px;">批注说明</h3>
+                ${pageAnnos.map(a => `
+                <div class="annotation-item">
+                    <div class="annotation-item-title">${a.id}. ${a.title}</div>
+                    <div class="annotation-item-content">${a.content || '暂无说明'}</div>
+                </div>
+                `).join('')}
+            </div>
+            ` : ''}
+        </div>
+            `;
+        }).join('')}
+    </div>
+</body>
+</html>`;
+        }
+
+        // 生成图片导出HTML
+        function generateImageExportHTML() {
+            return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>原型 - 带批注标记</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 40px; background: #f5f5f5; }
+        h1 { text-align: center; margin-bottom: 40px; }
+        .page { background: white; border-radius: 12px; padding: 24px; margin-bottom: 40px; }
+        .page-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+        .page-image-container { position: relative; display: inline-block; }
+        .page-image { max-width: 100%; display: block; }
+        .annotation-marker { position: absolute; width: 28px; height: 28px; background: #EF4444; border-radius: 50%; color: white; font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; transform: translate(-50%, -50%); box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4); }
+        .annotations { margin-top: 20px; }
+        .annotation-item { padding: 12px 16px; background: #fef2f2; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #EF4444; }
+        .annotation-item-title { font-weight: 500; margin-bottom: 4px; }
+        .annotation-item-content { font-size: 13px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <h1>📐 原型批注文档</h1>
+    ${pages.map((page, idx) => {
+        const pageAnnos = annotations[idx] || [];
+        // HTML类型页面直接显示，不显示批注标记
+        if (page.type === 'html') {
+            return `
+        <div class="page">
+            <div class="page-title">${page.name}（Axure导出版）</div>
+            <div class="page-image-container">
+                <iframe src="data:text/html;base64,${btoa(page.html)}" style="width:100%;height:600px;border:1px solid #e5e7eb;"></iframe>
+            </div>
+            ${pageAnnos.length > 0 ? `
+            <div class="annotations">
+                <h3 style="margin-bottom: 12px; font-size: 14px;">批注说明</h3>
+                ${pageAnnos.map(a => `
+                <div class="annotation-item">
+                    <div class="annotation-item-title">${a.id}. ${a.title}</div>
+                    <div class="annotation-item-content">${a.content || '暂无说明'}</div>
+                </div>
+                `).join('')}
+            </div>
+            ` : '<p style="color: #999; margin-top: 20px; font-size: 13px;">此页面暂无批注</p>'}
+        </div>
+            `;
+        }
+        
+        return `
+        <div class="page">
+            <div class="page-title">${page.name}</div>
+            <div class="page-image-container">
+                <img src="${page.image}" class="page-image" alt="${page.name}">
+                ${pageAnnos.map(a => `<div class="annotation-marker" style="left: ${a.x}px; top: ${a.y}px;">${a.id}</div>`).join('')}
+            </div>
+            ${pageAnnos.length > 0 ? `
+            <div class="annotations">
+                <h3 style="margin-bottom: 12px; font-size: 14px;">批注说明</h3>
+                ${pageAnnos.map(a => `
+                <div class="annotation-item">
+                    <div class="annotation-item-title">${a.id}. ${a.title}</div>
+                    <div class="annotation-item-content">${a.content || '暂无说明'}</div>
+                </div>
+                `).join('')}
+            </div>
+            ` : '<p style="color: #999; margin-top: 20px; font-size: 13px;">此页面暂无批注</p>'}
+        </div>
+        `;
+    }).join('')}
+</body>
+</html>`;
+        }
+
+        // 拖拽上传
+        const uploadZone = document.getElementById('uploadZone');
+        
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            handleUpload(e.dataTransfer.files);
+        });
+        
+        document.getElementById('uploadInput').addEventListener('change', (e) => {
+            handleUpload(e.target.files);
+        });
+        
+        // 上传Axure导出的HTML包
+        function uploadAxureHTML() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.html,.htm';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                // 读取HTML文件
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    // 创建一个临时iframe来加载HTML
+                    const tempFrame = document.createElement('iframe');
+                    tempFrame.style.display = 'none';
+                    document.body.appendChild(tempFrame);
+                    
+                    tempFrame.onload = function() {
+                        // 获取iframe的内容
+                        try {
+                            const content = tempFrame.contentDocument.documentElement.outerHTML;
+                            
+                            // 保存为页面数据
+                            const page = {
+                                name: file.name.replace(/\.[^/.]+$/, ''),
+                                html: content,
+                                type: 'html'
+                            };
+                            
+                            pages = [page];
+                            saveToStorage();
+                            switchMode('upload');
+                            renderThumbnails();
+                            
+                            alert(`成功加载 Axure HTML！\n\n页面名称：${page.name}`);
+                            
+                            // 清理临时iframe
+                            setTimeout(() => {
+                                document.body.removeChild(tempFrame);
+                            }, 100);
+                            
+                        } catch (err) {
+                            alert('加载失败：' + err.message + '\n\n可能原因：HTML包含跨域脚本');
+                            document.body.removeChild(tempFrame);
+                        }
+                    };
+                    
+                    // 加载HTML内容到iframe
+                    const htmlContent = e.target.result;
+                    const blob = new Blob([htmlContent], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    tempFrame.src = url;
+                };
+                
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        // 点击空白处关闭卡片
+        document.addEventListener('click', (e) => {
+            if (!annotationCard.contains(e.target) && !e.target.classList.contains('annotation-dot')) {
+                annotationCard.classList.remove('visible');
+            }
+        });
+
+        // ========== 云端协作模块（Supabase） ==========
+        const SUPABASE_URL = 'https://qxxcegkgbjmfiikdqlbe.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_9pXNjQXk0qOnXs6Jh4DrCQ_-k0Rrj1z';
+        let sb = null; // Supabase client（懒加载）
+        let cloudProjectId = localStorage.getItem('pv_cloudProjectId') || '';
+        let cloudSyncEnabled = false;
+        let cloudSyncInterval = null;
+
+        function getSB() {
+            if (!sb) {
+                sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            }
+            return sb;
+        }
+
+        // 检查本地是否有已关联的云项目
+        function checkCloudProject() {
+            const id = localStorage.getItem('pv_cloudProjectId');
+            const joinBtn = document.getElementById('cloudJoinBtn');
+            if (id && joinBtn) {
+                cloudProjectId = id;
+                joinBtn.style.display = 'flex';
+                document.getElementById('cloudProjectTitle').textContent = '查看云项目 #' + id.slice(-6);
+                document.getElementById('cloudProjectDesc').textContent = '点击复制协作链接';
+                // 启用自动同步
+                enableCloudSync();
+            }
+        }
+
+        // 显示协作链接
+        function showCloudJoin() {
+            if (!cloudProjectId) return;
+            const link = window.location.origin + window.location.pathname + '?cloud=' + cloudProjectId;
+            const linkBox = document.getElementById('shareLinkBox');
+            document.getElementById('shareLinkInput').value = link;
+            linkBox.style.display = 'block';
+            document.getElementById('shareLinkInput').select();
+            document.execCommand('copy');
+            document.getElementById('shareLinkCopyBtn').textContent = '已复制';
+            setTimeout(() => { document.getElementById('shareLinkCopyBtn').textContent = '复制'; }, 2000);
+        }
+
+        // 打开云端上传对话框
+        function openCloudShare() {
+            const name = prompt('给这个项目起个名字：', '原型评审 - ' + new Date().toLocaleDateString('zh-CN'));
+            if (!name) return;
+
+            const author = prompt('你的名字（用于标注作者）：', localStorage.getItem('pv_lastAuthor') || '');
+            if (author) localStorage.setItem('pv_lastAuthor', author);
+
+            uploadToCloud(name, author || '匿名');
+        }
+
+        // 上传到云端
+        async function uploadToCloud(name, author) {
+            const progressEl = document.getElementById('shareProgress');
+            const progressBar = document.getElementById('shareProgressBar');
+            const progressTitle = document.getElementById('shareProgressTitle');
+            const progressDesc = document.getElementById('shareProgressDesc');
+
+            document.getElementById('shareAxureOptions').style.display = 'none';
+            progressEl.style.display = 'block';
+            progressTitle.textContent = '正在上传到云端...';
+            progressDesc.textContent = '准备数据中';
+            progressBar.style.width = '10%';
+
+            try {
+                const client = getSB();
+
+                // 1. 截取页面
+                progressDesc.textContent = '截取页面中...';
+                progressBar.style.width = '20%';
+
+                const pageList = getSelectedSharePages();
+                if (pageList.length === 0) {
+                    throw new Error('没有找到页面');
+                }
+
+                let screenshots = [];
+                for (let i = 0; i < pageList.length; i++) {
+                    progressDesc.textContent = '截取页面 ' + (i + 1) + '/' + pageList.length + '...';
+                    progressBar.style.width = (20 + 40 * (i / pageList.length)) + '%';
+                    try {
+                        const shot = await captureAxurePage(pageList[i]);
+                        screenshots.push({ page_name: pageList[i], image_data: shot });
+                    } catch (e) {
+                        console.warn('截图失败:', pageList[i], e);
+                        screenshots.push({ page_name: pageList[i], image_data: '' });
+                    }
+                }
+
+                // 2. 创建云项目
+                progressDesc.textContent = '创建云项目...';
+                progressBar.style.width = '70%';
+
+                const projId = 'proj_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+                const { data: projData, error: projErr } = await client
+                    .from('projects')
+                    .insert({
+                        id: projId,
+                        name: name,
+                        creator_name: author,
+                        axure_url: axureUrl || '',
+                        page_list: pageList
+                    })
+                    .select()
+                    .single();
+
+                if (projErr) throw projErr;
+
+                // 3. 上传截图
+                progressDesc.textContent = '上传截图中...';
+                progressBar.style.width = '80%';
+
+                for (const shot of screenshots) {
+                    if (shot.image_data) {
+                        await client.from('page_screenshots').insert({
+                            project_id: projId,
+                            page_name: shot.page_name,
+                            image_data: shot.image_data
+                        });
+                    }
+                }
+
+                // 4. 上传本地批注
+                progressDesc.textContent = '同步批注数据...';
+                progressBar.style.width = '90%';
+
+                for (const [key, annos] of Object.entries(annotations)) {
+                    for (const anno of annos) {
+                        await client.from('annotations').insert({
+                            project_id: projId,
+                            page_name: key,
+                            x: anno.x || 0,
+                            y: anno.y || 0,
+                            title: anno.title || '',
+                            content: anno.content || '',
+                            author_name: author,
+                            resolved: anno.resolved || false,
+                            replies: anno.replies || []
+                        });
+                    }
+                }
+
+                // 5. 完成
+                cloudProjectId = projId;
+                localStorage.setItem('pv_cloudProjectId', projId);
+                enableCloudSync();
+
+                progressBar.style.width = '100%';
+                progressTitle.textContent = '上传完成！';
+                progressDesc.textContent = '云项目已创建，正在生成协作链接...';
+
+                const link = window.location.origin + window.location.pathname + '?cloud=' + projId;
+                document.getElementById('shareLinkInput').value = link;
+                document.getElementById('shareLinkBox').style.display = 'block';
+
+                setTimeout(() => {
+                    document.getElementById('shareProgressIcon').textContent = '✅';
+                }, 500);
+
+            } catch (err) {
+                console.error('云端上传失败:', err);
+                alert('上传失败: ' + (err.message || JSON.stringify(err)));
+                document.getElementById('shareAxureOptions').style.display = 'block';
+            }
+        }
+
+        // 从云端加载项目
+        async function loadFromCloud(projectId) {
+            try {
+                const client = getSB();
+
+                // 加载项目信息
+                const { data: proj, error: projErr } = await client
+                    .from('projects')
+                    .select('*')
+                    .eq('id', projectId)
+                    .single();
+
+                if (projErr || !proj) {
+                    console.error('加载项目失败:', projErr);
+                    return;
+                }
+
+                // 加载截图
+                const { data: shots } = await client
+                    .from('page_screenshots')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 加载批注
+                const { data: annos } = await client
+                    .from('annotations')
+                    .select('*')
+                    .eq('project_id', projectId);
+
+                // 合并到本地数据
+                if (proj.page_list && proj.page_list.length > 0) {
+                    pages = proj.page_list.map(name => ({
+                        name: name,
+                        screenshot: (shots || []).find(s => s.page_name === name)?.image_data || '',
+                        type: 'cloud'
+                    }));
+                }
+
+                // 重建 annotations 对象
+                annotations = {};
+                nextAnnotationId = 1;
+                if (annos) {
+                    for (const a of annos) {
+                        const key = a.page_name || 'default';
+                        if (!annotations[key]) annotations[key] = [];
+                        nextAnnotationId++;
+                        annotations[key].push({
+                            id: nextAnnotationId - 1,
+                            x: a.x,
+                            y: a.y,
+                            title: a.title,
+                            content: a.content,
+                            author: a.author_name,
+                            resolved: a.resolved,
+                            replies: a.replies || [],
+                            pagePath: a.page_name,
+                            mode: 'axure',
+                            cloudId: a.id
+                        });
+                    }
+                }
+
+                cloudProjectId = projectId;
+                localStorage.setItem('pv_cloudProjectId', projectId);
+                saveToStorage();
+
+                // 切换到上传模式展示截图
+                switchMode('upload');
+                renderThumbnails();
+                renderAnnotationsList();
+                enableCloudSync();
+
+                console.log('云项目加载完成:', proj.name, '页面:', pages.length, '批注:', annos?.length || 0);
+
+            } catch (err) {
+                console.error('加载云项目失败:', err);
+            }
+        }
+
+        // 启用云端自动同步
+        function enableCloudSync() {
+            if (cloudSyncInterval) clearInterval(cloudSyncInterval);
+            cloudSyncEnabled = true;
+            // 每30秒检查一次云端更新
+            cloudSyncInterval = setInterval(syncFromCloud, 30000);
+        }
+
+        // 从云端同步最新的批注（增量）
+        async function syncFromCloud() {
+            if (!cloudProjectId || !cloudSyncEnabled) return;
+            try {
+                const client = getSB();
+                const { data: annos } = await client
+                    .from('annotations')
+                    .select('*')
+                    .eq('project_id', cloudProjectId)
+                    .order('created_at', { ascending: true });
+
+                if (!annos) return;
+
+                // 重建 annotations 对象
+                const newAnnotations = {};
+                let maxId = 0;
+
+                for (const a of annos) {
+                    const key = a.page_name || 'default';
+                    if (!newAnnotations[key]) newAnnotations[key] = [];
+                    maxId++;
+                    newAnnotations[key].push({
+                        id: maxId,
+                        x: a.x,
+                        y: a.y,
+                        title: a.title,
+                        content: a.content,
+                        author: a.author_name,
+                        resolved: a.resolved,
+                        replies: a.replies || [],
+                        pagePath: a.page_name,
+                        mode: 'axure',
+                        cloudId: a.id
+                    });
+                }
+
+                // 检测是否有变化
+                const oldJson = JSON.stringify(annotations);
+                const newJson = JSON.stringify(newAnnotations);
+                if (oldJson !== newJson) {
+                    annotations = newAnnotations;
+                    nextAnnotationId = maxId + 1;
+                    renderAnnotations();
+                    renderAnnotationsList();
+                    saveToStorage();
+                    console.log('云端同步完成，更新了批注');
+                }
+            } catch (err) {
+                console.warn('云端同步失败:', err);
+            }
+        }
+
+        // 上传单条批注到云端
+        async function pushAnnotationToCloud(pageName, annoData) {
+            if (!cloudProjectId || !cloudSyncEnabled) return;
+            try {
+                const client = getSB();
+                await client.from('annotations').insert({
+                    project_id: cloudProjectId,
+                    page_name: pageName,
+                    x: annoData.x || 0,
+                    y: annoData.y || 0,
+                    title: annoData.title || '',
+                    content: annoData.content || '',
+                    author_name: annoData.author || '匿名',
+                    resolved: annoData.resolved || false,
+                    replies: annoData.replies || []
+                });
+            } catch (err) {
+                console.warn('推送批注失败:', err);
+            }
+        }
+
+        // 从云端删除批注
+        async function deleteAnnotationFromCloud(cloudId) {
+            if (!cloudProjectId || !cloudSyncEnabled || !cloudId) return;
+            try {
+                const client = getSB();
+                await client.from('annotations').delete().eq('id', cloudId);
+            } catch (err) {
+                console.warn('删除云端批注失败:', err);
+            }
+        }
+
+        // 更新云端批注（解决状态、回复等）
+        async function updateAnnotationInCloud(cloudId, updates) {
+            if (!cloudProjectId || !cloudSyncEnabled || !cloudId) return;
+            try {
+                const client = getSB();
+                await client.from('annotations').update(updates).eq('id', cloudId);
+            } catch (err) {
+                console.warn('更新云端批注失败:', err);
+            }
+        }
+
+        // URL 参数检测：打开时如果有 ?cloud=xxx，自动加载云项目
+        function checkCloudUrlParam() {
+            const params = new URLSearchParams(window.location.search);
+            const cloudId = params.get('cloud');
+            if (cloudId) {
+                console.log('检测到云项目ID:', cloudId);
+                loadFromCloud(cloudId);
+            }
+        }
+
+        // 初始化
+        init();
+        checkCloudProject();
+    </script>
+</body>
+</html>
