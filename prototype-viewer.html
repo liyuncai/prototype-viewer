@@ -2950,17 +2950,48 @@
             return ordered;
         }
         
+        // 备用截图方案：直接用 canvas 绘制 iframe 可见区域
+        function fallbackCapture() {
+            try {
+                var vpW = axureFrame.clientWidth || 1280;
+                var vpH = axureFrame.clientHeight || 800;
+                var cvs = document.createElement('canvas');
+                cvs.width = vpW;
+                cvs.height = vpH;
+                var ctx = cvs.getContext('2d');
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, vpW, vpH);
+                // 尝试绘制 iframe（同源下可以）
+                try { ctx.drawImage(axureFrame, 0, 0, vpW, vpH); } catch(e) {
+                    // 跨域时 drawImage 会失败，返回空
+                    console.warn('canvas drawImage iframe 失败(跨域?)');
+                    return '';
+                }
+                var dataUrl = cvs.toDataURL('image/png', 0.8);
+                console.log('备用截图成功:', dataUrl.length, 'bytes');
+                return dataUrl;
+            } catch(e) {
+                console.error('备用截图也失败:', e);
+                return '';
+            }
+        }
+        
         // 截取 Axure 指定页面的截图
         function captureAxurePage(pageName) {
             return new Promise(async (resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('截图超时(15秒)')), 15000);
+                const timeout = setTimeout(() => {
+                    console.warn('截图超时，使用备用方案');
+                    resolve(fallbackCapture());
+                }, 30000);
                 try {
                     const iframeWin = axureFrame.contentWindow;
                     const iframeDoc = axureFrame.contentDocument;
                     
+                    // 快速检查 iframe 是否可访问
                     if (!iframeWin || !iframeDoc) {
+                        console.warn('无法访问 Axure iframe，使用备用方案');
                         clearTimeout(timeout);
-                        reject(new Error('无法访问 Axure iframe'));
+                        resolve(fallbackCapture());
                         return;
                     }
                     
@@ -3002,15 +3033,26 @@
                         return;
                     }
                     
-                    // 加载 html-to-image 库
+                    // 加载 html-to-image 库（注入到 iframe 内部）
                     if (!targetWin.htmlToImageLoaded) {
+                        console.log('正在加载 html-to-image 到 iframe...');
                         const script = targetDoc.createElement('script');
                         script.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.umd.js';
                         targetDoc.head.appendChild(script);
-                        await new Promise((res, rej) => {
-                            script.onload = () => { targetWin.htmlToImageLoaded = true; res(); };
-                            script.onerror = () => rej(new Error('无法加载截图库，请检查网络'));
-                        });
+                        try {
+                            await Promise.race([
+                                new Promise((res, rej) => {
+                                    script.onload = () => { targetWin.htmlToImageLoaded = true; res(); };
+                                    script.onerror = () => rej(new Error('加载截图库失败'));
+                                }),
+                                new Promise((_, rej) => setTimeout(() => rej(new Error('截图库加载超时')), 10000))
+                            ]);
+                        } catch(libErr) {
+                            console.warn('html-to-image 加载失败，使用备用方案:', libErr.message);
+                            clearTimeout(timeout);
+                            resolve(fallbackCapture());
+                            return;
+                        }
                     }
                     
                     // 获取页面真实尺寸
