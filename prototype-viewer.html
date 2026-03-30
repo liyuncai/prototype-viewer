@@ -3100,13 +3100,36 @@
                         }
                     }
                     
+                    if (!dataUrl || dataUrl === 'data:,') {
+                        console.warn('html-to-image 返回空，尝试 canvas 直接绘制 iframe');
+                        try {
+                            // 方案D：直接用 canvas 绘制 iframe 可见区域
+                            var vpW2 = axureFrame.clientWidth || 1280;
+                            var vpH2 = axureFrame.clientHeight || 800;
+                            var cvs2 = document.createElement('canvas');
+                            cvs2.width = vpW2;
+                            cvs2.height = vpH2;
+                            var ctx2 = cvs2.getContext('2d');
+                            ctx2.fillStyle = '#ffffff';
+                            ctx2.fillRect(0, 0, vpW2, vpH2);
+                            ctx2.drawImage(axureFrame, 0, 0, vpW2, vpH2);
+                            dataUrl = cvs2.toDataURL('image/png', 0.85);
+                            console.log('截图成功(canvas iframe):', pageName, dataUrl.length, 'bytes');
+                        } catch(e4) {
+                            console.error('所有截图方案均失败:', e4.message);
+                            clearTimeout(timeout);
+                            resolve('');
+                            return;
+                        }
+                    }
+
                     clearTimeout(timeout);
-                    resolve(dataUrl);
+                    resolve(dataUrl || '');
                     
                 } catch(e) {
                     clearTimeout(timeout);
                     console.error('截图失败:', pageName, e);
-                    reject(e);
+                    resolve(''); // 不reject，返回空字符串让上传流程继续
                 }
             });
         }
@@ -4302,13 +4325,10 @@ ${JSON.stringify(packageData, null, 2)}
                 for (let i = 0; i < pageList.length; i++) {
                     progressDesc.textContent = '截取页面 ' + (i + 1) + '/' + pageList.length + '...';
                     progressBar.style.width = (20 + 40 * (i / pageList.length)) + '%';
-                    try {
-                        const shot = await captureAxurePage(pageList[i]);
-                        screenshots.push({ page_name: pageList[i], image_data: shot });
-                    } catch (e) {
-                        console.warn('截图失败:', pageList[i], e);
-                        screenshots.push({ page_name: pageList[i], image_data: '' });
-                    }
+                    const shot = await captureAxurePage(pageList[i]);
+                    const shotLen = shot ? shot.length : 0;
+                    console.log('截图结果:', pageList[i], '长度:', shotLen);
+                    screenshots.push({ page_name: pageList[i], image_data: shot || '' });
                 }
 
                 // 2. 创建云项目
