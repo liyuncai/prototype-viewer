@@ -4401,7 +4401,9 @@ ${JSON.stringify(packageData, null, 2)}
         // 显示协作链接
         function showCloudJoin() {
             if (!cloudProjectId) return;
-            const link = window.location.origin + window.location.pathname + '?cloud=' + cloudProjectId;
+            // 使用 GitHub Pages 线上地址（而不是本地 127.0.0.1）
+            const onlineUrl = 'https://liyuncai.github.io/prototype-viewer/prototype-viewer.html';
+            const link = onlineUrl + '?cloud=' + cloudProjectId;
             const linkBox = document.getElementById('shareLinkBox');
             document.getElementById('shareLink').value = link;
             linkBox.style.display = 'block';
@@ -4519,7 +4521,9 @@ ${JSON.stringify(packageData, null, 2)}
                 progressTitle.textContent = '上传完成！';
                 progressDesc.textContent = '云项目已创建，正在生成协作链接...';
 
-                const link = window.location.origin + window.location.pathname + '?cloud=' + projId;
+                // 使用 GitHub Pages 线上地址（而不是本地 127.0.0.1）
+                const onlineUrl = 'https://liyuncai.github.io/prototype-viewer/prototype-viewer.html';
+                const link = onlineUrl + '?cloud=' + projId;
                 document.getElementById('shareLink').value = link;
                 document.getElementById('shareProgress').style.display = 'none';
                 document.getElementById('shareAxureOptions').style.display = 'none';
