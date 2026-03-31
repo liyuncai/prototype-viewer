@@ -3018,25 +3018,98 @@
         
         // 备用截图方案2：直接用 canvas 绘制 iframe 可见区域
         function fallbackCapture() {
+            return new Promise((resolve) => {
+                try {
+                    var vpW = axureFrame.clientWidth || 1280;
+                    var vpH = axureFrame.clientHeight || 800;
+                    var cvs = document.createElement('canvas');
+                    cvs.width = vpW;
+                    cvs.height = vpH;
+                    var ctx = cvs.getContext('2d');
+                    ctx.fillStyle = '#f0f0f0';
+                    ctx.fillRect(0, 0, vpW, vpH);
+                    try { ctx.drawImage(axureFrame, 0, 0, vpW, vpH); } catch(e) {
+                        console.warn('canvas drawImage iframe 失败(跨域?)，尝试获取iframe内部内容');
+                        fallbackCaptureIframe().then(resolve);
+                        return;
+                    }
+                    var dataUrl = cvs.toDataURL('image/png', 0.8);
+                    console.log('备用截图成功:', dataUrl.length, 'bytes');
+                    resolve(dataUrl);
+                } catch(e) {
+                    console.error('备用截图也失败:', e);
+                    resolve('');
+                }
+            });
+        }
+
+        // 备用截图方案3：从 iframe 内部截取 DOM（需要同源）
+        function fallbackCaptureIframe() {
             try {
-                var vpW = axureFrame.clientWidth || 1280;
-                var vpH = axureFrame.clientHeight || 800;
-                var cvs = document.createElement('canvas');
-                cvs.width = vpW;
-                cvs.height = vpH;
-                var ctx = cvs.getContext('2d');
-                ctx.fillStyle = '#f0f0f0';
-                ctx.fillRect(0, 0, vpW, vpH);
-                try { ctx.drawImage(axureFrame, 0, 0, vpW, vpH); } catch(e) {
-                    console.warn('canvas drawImage iframe 失败(跨域?)');
+                const iframeDoc = axureFrame.contentDocument;
+                const iframeWin = axureFrame.contentWindow;
+                if (!iframeDoc || !iframeWin) {
+                    console.warn('无法访问 iframe 内部文档');
                     return '';
                 }
-                var dataUrl = cvs.toDataURL('image/png', 0.8);
-                console.log('备用截图成功:', dataUrl.length, 'bytes');
-                return dataUrl;
+
+                // 找到实际渲染的页面容器
+                let targetContent = null;
+                const mainFrame = iframeDoc.querySelector('#mainFrame');
+                if (mainFrame && mainFrame.contentDocument) {
+                    const targetDoc = mainFrame.contentDocument;
+                    const base = targetDoc.querySelector('#base');
+                    targetContent = base || targetDoc.body;
+                } else {
+                    targetContent = iframeDoc.body;
+                }
+
+                if (!targetContent) {
+                    console.warn('无法找到页面内容');
+                    return '';
+                }
+
+                // 计算尺寸
+                const rect = targetContent.getBoundingClientRect();
+                const width = Math.max(targetContent.scrollWidth, rect.width, 800);
+                const height = Math.max(targetContent.scrollHeight, rect.height, 600);
+
+                console.log('iframe 内部截图尺寸:', width, 'x', height);
+
+                // 使用 SVG foreignObject 截图
+                const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
+                    '<foreignObject width="100%" height="100%">' +
+                    '<div xmlns="http://www.w3.org/1999/xhtml">' +
+                    targetContent.outerHTML.substring(0, 50000) + // 限制长度避免太大
+                    '</div></foreignObject></svg>';
+
+                const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+                const svgUrl = URL.createObjectURL(svgBlob);
+
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = iframeDoc.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, width, height);
+                        ctx.drawImage(img, 0, 0);
+                        URL.revokeObjectURL(svgUrl);
+                        const dataUrl = canvas.toDataURL('image/png', 0.8);
+                        console.log('iframe 内部截图成功:', dataUrl.length, 'bytes');
+                        resolve(dataUrl);
+                    };
+                    img.onerror = function() {
+                        console.error('SVG 转图片失败');
+                        resolve('');
+                    };
+                    img.src = svgUrl;
+                });
             } catch(e) {
-                console.error('备用截图也失败:', e);
-                return '';
+                console.error('iframe 内部截图失败:', e);
+                return Promise.resolve('');
             }
         }
         
@@ -3045,7 +3118,8 @@
             return new Promise(async (resolve, reject) => {
                 const timeout = setTimeout(() => {
                     console.warn('截图超时，使用备用方案');
-                    resolve(fallbackCapture());
+                    // 超时时用 Promise 包装 fallbackCapture
+                    fallbackCaptureIframe().then(resolve);
                 }, 30000);
                 try {
                     const iframeWin = axureFrame.contentWindow;
