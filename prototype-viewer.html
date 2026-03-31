@@ -4484,11 +4484,19 @@ ${JSON.stringify(packageData, null, 2)}
 
                 for (const shot of screenshots) {
                     if (shot.image_data) {
-                        await client.from('page_screenshots').insert({
+                        console.log('准备上传截图:', shot.page_name, '数据长度:', shot.image_data.length);
+                        const { error: shotErr } = await client.from('page_screenshots').insert({
                             project_id: projId,
                             page_name: shot.page_name,
                             image_data: shot.image_data
                         });
+                        if (shotErr) {
+                            console.error('截图上传失败:', shot.page_name, shotErr);
+                        } else {
+                            console.log('截图上传成功:', shot.page_name);
+                        }
+                    } else {
+                        console.warn('跳过空截图:', shot.page_name);
                     }
                 }
 
@@ -4558,10 +4566,19 @@ ${JSON.stringify(packageData, null, 2)}
                 }
 
                 // 加载截图
-                const { data: shots } = await client
+                const { data: shots, error: shotErr } = await client
                     .from('page_screenshots')
                     .select('*')
                     .eq('project_id', projectId);
+
+                if (shotErr) {
+                    console.error('加载截图失败:', shotErr);
+                } else {
+                    console.log('加载到的截图数量:', shots?.length || 0);
+                    shots?.forEach(s => {
+                        console.log('截图:', s.page_name, '数据长度:', s.image_data?.length || 0, '前100字符:', s.image_data?.substring(0, 100));
+                    });
+                }
 
                 // 加载批注
                 const { data: annos } = await client
@@ -4571,11 +4588,15 @@ ${JSON.stringify(packageData, null, 2)}
 
                 // 合并到本地数据
                 if (proj.page_list && proj.page_list.length > 0) {
-                    pages = proj.page_list.map(name => ({
-                        name: name,
-                        screenshot: (shots || []).find(s => s.page_name === name)?.image_data || '',
-                        type: 'cloud'
-                    }));
+                    pages = proj.page_list.map(name => {
+                        const matchedShot = (shots || []).find(s => s.page_name === name);
+                        console.log('页面:', name, '匹配截图:', matchedShot ? '是' : '否');
+                        return {
+                            name: name,
+                            screenshot: matchedShot?.image_data || '',
+                            type: 'cloud'
+                        };
+                    });
                 }
 
                 // 重建 annotations 对象
