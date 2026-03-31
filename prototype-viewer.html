@@ -2950,7 +2950,73 @@
             return ordered;
         }
         
-        // 备用截图方案：直接用 canvas 绘制 iframe 可见区域
+        // 备用截图方案：DOM → SVG foreignObject → Canvas（纯原生，不依赖第三方库）
+        function nativeDomCapture(targetDoc, pageContent, pageName) {
+            try {
+                var w = Math.max(pageContent.scrollWidth, 800);
+                var h = Math.max(pageContent.scrollHeight, 600);
+                if (w > 4096) w = 4096;
+                if (h > 4096) h = 4096;
+                
+                // 克隆节点，移除不需要的元素
+                var clone = pageContent.cloneNode(true);
+                var removeIds = ['sitemapTreeContainer', 'interfaceControlFrame', 'footerContainer'];
+                removeIds.forEach(function(id) {
+                    var el = clone.querySelector('#' + id);
+                    if (el) el.remove();
+                });
+                
+                // 序列化为 HTML
+                var serializer = new XMLSerializer();
+                var htmlStr = serializer.serializeToString(clone);
+                
+                // 构建 SVG foreignObject
+                var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+                    '<foreignObject width="100%" height="100%">' +
+                    '<div xmlns="http://www.w3.org/1999/xhtml">' +
+                    htmlStr +
+                    '</div></foreignObject></svg>';
+                
+                var svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+                var url = URL.createObjectURL(svgBlob);
+                
+                var img = new Image();
+                img.crossOrigin = 'anonymous';
+                
+                return new Promise(function(resolve) {
+                    img.onload = function() {
+                        try {
+                            var cvs = targetDoc.createElement('canvas');
+                            cvs.width = w;
+                            cvs.height = h;
+                            var ctx = cvs.getContext('2d');
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillRect(0, 0, w, h);
+                            ctx.drawImage(img, 0, 0, w, h);
+                            URL.revokeObjectURL(url);
+                            var result = cvs.toDataURL('image/png', 0.8);
+                            console.log('原生截图成功:', pageName, result.length, 'bytes');
+                            resolve(result);
+                        } catch(e) {
+                            console.warn('SVG->Canvas 失败:', e.message);
+                            URL.revokeObjectURL(url);
+                            resolve('');
+                        }
+                    };
+                    img.onerror = function() {
+                        console.warn('SVG 加载失败');
+                        URL.revokeObjectURL(url);
+                        resolve('');
+                    };
+                    img.src = url;
+                });
+            } catch(e) {
+                console.error('原生截图失败:', e);
+                return Promise.resolve('');
+            }
+        }
+        
+        // 备用截图方案2：直接用 canvas 绘制 iframe 可见区域
         function fallbackCapture() {
             try {
                 var vpW = axureFrame.clientWidth || 1280;
@@ -2961,9 +3027,7 @@
                 var ctx = cvs.getContext('2d');
                 ctx.fillStyle = '#f0f0f0';
                 ctx.fillRect(0, 0, vpW, vpH);
-                // 尝试绘制 iframe（同源下可以）
                 try { ctx.drawImage(axureFrame, 0, 0, vpW, vpH); } catch(e) {
-                    // 跨域时 drawImage 会失败，返回空
                     console.warn('canvas drawImage iframe 失败(跨域?)');
                     return '';
                 }
@@ -3034,21 +3098,41 @@
                     }
                     
                     // 加载 html-to-image 库（注入到 iframe 内部）
+                    // 多源尝试：npmmirror（国内镜像）-> bootcdn -> jsdelivr（国外）
                     if (!targetWin.htmlToImageLoaded) {
                         console.log('正在加载 html-to-image 到 iframe...');
-                        const script = targetDoc.createElement('script');
-                        script.src = 'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.umd.js';
-                        targetDoc.head.appendChild(script);
-                        try {
-                            await Promise.race([
-                                new Promise((res, rej) => {
-                                    script.onload = () => { targetWin.htmlToImageLoaded = true; res(); };
-                                    script.onerror = () => rej(new Error('加载截图库失败'));
-                                }),
-                                new Promise((_, rej) => setTimeout(() => rej(new Error('截图库加载超时')), 10000))
-                            ]);
-                        } catch(libErr) {
-                            console.warn('html-to-image 加载失败，使用备用方案:', libErr.message);
+                        const cdnUrls = [
+                            'https://unpkg.zhimg.com/npm/html-to-image@1.11.11/dist/html-to-image.umd.js',
+                            'https://npmmirror.com/packages/html-to-image/files/1.11.11/dist/html-to-image.umd.js',
+                            'https://cdn.bootcdn.net/ajax/libs/html-to-image/1.11.11/html-to-image.umd.js',
+                            'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.umd.js'
+                        ];
+                        let lastErr = null;
+                        for (let cdnUrl of cdnUrls) {
+                            try {
+                                console.log('尝试 CDN:', cdnUrl);
+                                const script = targetDoc.createElement('script');
+                                script.src = cdnUrl;
+                                targetDoc.head.appendChild(script);
+                                await Promise.race([
+                                    new Promise((res, rej) => {
+                                        script.onload = () => { targetWin.htmlToImageLoaded = true; res(); };
+                                        script.onerror = () => rej(new Error('CDN 加载失败'));
+                                    }),
+                                    new Promise((_, rej) => setTimeout(() => rej(new Error('CDN 超时')), 8000))
+                                ]);
+                                console.log('CDN 加载成功');
+                                break;
+                            } catch (cdnErr) {
+                                lastErr = cdnErr;
+                                console.warn('CDN 失败:', cdnUrl, cdnErr.message);
+                                // 移除失败的 script 标签
+                                const failedScript = targetDoc.querySelector('script[src="' + cdnUrl + '"]');
+                                if (failedScript) failedScript.remove();
+                            }
+                        }
+                        if (!targetWin.htmlToImageLoaded) {
+                            console.warn('所有 CDN 都失败，使用备用方案');
                             clearTimeout(timeout);
                             resolve(fallbackCapture());
                             return;
