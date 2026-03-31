@@ -4521,9 +4521,9 @@ ${JSON.stringify(packageData, null, 2)}
 
                 const link = window.location.origin + window.location.pathname + '?cloud=' + projId;
                 document.getElementById('shareLink').value = link;
-                document.getElementById('shareLinkBox').style.display = 'block';
                 document.getElementById('shareProgress').style.display = 'none';
-                document.getElementById('shareAxureOptions').style.display = 'block';
+                document.getElementById('shareAxureOptions').style.display = 'none';
+                document.getElementById('shareLinkBox').style.display = 'block';
 
                 setTimeout(() => {
                     document.getElementById('shareProgressIcon').textContent = '✅';
