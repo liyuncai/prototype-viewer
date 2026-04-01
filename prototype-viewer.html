@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>原型查看器 - 连接Axure预览</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='4' fill='%234F46E5'/><rect x='6' y='8' width='20' height='14' rx='2' fill='white'/><rect x='10' y='24' width='12' height='2' rx='1' fill='white'/><rect x='8' y='22' width='16' height='2' rx='1' fill='white' opacity='.5'/></svg>">
     <script>
         // 动态加载 Supabase（多源备援）
         (function loadSupabase() {
@@ -3070,107 +3071,25 @@
             }
         }
         
-        // 备用截图方案2：同源 iframe 截图（使用 createImageBitmap）
-        function fallbackCapture() {
-            console.log('=== 开始 fallbackCapture ===');
-            console.log('检查 axureFrame:', typeof axureFrame, !!axureFrame);
-            if (!axureFrame) {
-                console.error('axureFrame 不存在！');
-                return Promise.resolve('');
-            }
-            return new Promise((resolve) => {
-                try {
-                    var vpW = axureFrame.clientWidth || 1280;
-                    var vpH = axureFrame.clientHeight || 800;
-                    var cvs = document.createElement('canvas');
-                    cvs.width = vpW;
-                    cvs.height = vpH;
-                    var ctx = cvs.getContext('2d');
-                    ctx.fillStyle = '#f0f0f0';
-                    ctx.fillRect(0, 0, vpW, vpH);
-
-                    // 正确方式：用 createImageBitmap 捕获同源 iframe 的可见视口
-                    createImageBitmap(axureFrame.contentWindow).then(bitmap => {
-                        ctx.drawImage(bitmap, 0, 0, vpW, vpH);
-                        bitmap.close();
-                        var dataUrl = cvs.toDataURL('image/png', 0.8);
-                        console.log('fallbackCapture 成功 (createImageBitmap):', dataUrl.length, 'bytes');
-                        resolve(dataUrl);
-                    }).catch(e => {
-                        console.warn('createImageBitmap 失败(跨域或不支持):', e.message, '→ fallbackCaptureIframe');
-                        fallbackCaptureIframe().then(resolve);
-                    });
-                } catch(e) {
-                    console.error('备用截图异常:', e);
-                    fallbackCaptureIframe().then(resolve);
-                }
-            });
-        }
-
-        // 备用截图方案3：同源 iframe 截图（createImageBitmap + 占位图兜底）
-        // pageName 可选，用于占位图文字
-        function fallbackCaptureIframe(pageName) {
-            console.log('=== 开始 fallbackCaptureIframe ===');
-            return new Promise((resolve) => {
-                try {
-                    if (!axureFrame) {
-                        console.error('axureFrame 不存在！');
-                        resolve('');
-                        return;
-                    }
-
-                    const vpW = axureFrame.clientWidth || 1280;
-                    const vpH = axureFrame.clientHeight || 800;
-                    console.log('fallbackCaptureIframe 尺寸:', vpW, 'x', vpH);
-
-                    // 尝试 createImageBitmap（同源 iframe 视口截图）
-                    // canvas.drawImage(iframe) 和 canvas.drawImage(iframe.contentWindow) 都不合法！
-                    // 唯一正确方式：createImageBitmap(window) → ImageBitmap → drawImage(bitmap)
-                    const canvas = document.createElement('canvas');
-                    canvas.width = vpW;
-                    canvas.height = vpH;
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(0, 0, vpW, vpH);
-
-                    createImageBitmap(axureFrame.contentWindow).then(bitmap => {
-                        ctx.drawImage(bitmap, 0, 0, vpW, vpH);
-                        bitmap.close();
-                        const dataUrl = canvas.toDataURL('image/png', 0.8);
-                        console.log('fallbackCaptureIframe 成功 (createImageBitmap):', dataUrl.length, 'bytes');
-                        resolve(dataUrl);
-                    }).catch(drawErr => {
-                        console.warn('createImageBitmap 失败:', drawErr.message, '→ 生成占位图');
-                        // 生成一个带页面名的灰色占位图
-                        ctx.fillStyle = '#e8e8e8';
-                        ctx.fillRect(0, 0, vpW, vpH);
-                        ctx.strokeStyle = '#cccccc';
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(10, 10, vpW - 20, vpH - 20);
-                        ctx.fillStyle = '#aaaaaa';
-                        ctx.font = 'bold 48px Arial';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('🖼', vpW / 2, vpH / 2 - 40);
-                        ctx.fillStyle = '#555555';
-                        ctx.font = 'bold 20px Arial';
-                        ctx.fillText(pageName ? '页面: ' + pageName : '原型页面', vpW / 2, vpH / 2 + 20);
-                        ctx.fillStyle = '#888888';
-                        ctx.font = '14px Arial';
-                        ctx.fillText('截图预览不可用（跨域限制）', vpW / 2, vpH / 2 + 50);
-                        try {
-                            const placeholderUrl = canvas.toDataURL('image/png', 0.8);
-                            console.log('占位图生成成功:', placeholderUrl.length, 'bytes');
-                            resolve(placeholderUrl);
-                        } catch(e2) {
-                            console.error('占位图也失败:', e2);
-                            resolve('');
-                        }
-                    });
-                } catch(e) {
-                    console.error('fallbackCaptureIframe 异常:', e);
-                    resolve('');
-                }
-            });
+        // 截图最终兜底：生成带页面名的占位图
+        // 注意：Web 页面无法直接截取 iframe 内容（浏览器安全限制，drawImage/createImageBitmap 都不支持 iframe）
+        // 唯一有效方案是 html-to-image（同源 DOM 捕获），此函数仅用于 html-to-image 失败时兜底
+        function generatePlaceholder(pageName, w, h) {
+            w = w || 1280; h = h || 800;
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
+            ctx.strokeRect(1, 1, w - 2, h - 2);
+            ctx.fillStyle = '#aaa'; ctx.font = '48px Arial'; ctx.textAlign = 'center';
+            ctx.fillText('📄', w / 2, h / 2 - 30);
+            ctx.fillStyle = '#555'; ctx.font = 'bold 18px Arial';
+            ctx.fillText(pageName || '原型页面', w / 2, h / 2 + 15);
+            ctx.fillStyle = '#999'; ctx.font = '13px Arial';
+            ctx.fillText('截图预览不可用', w / 2, h / 2 + 42);
+            return canvas.toDataURL('image/png', 0.8);
         }
         
         // 截取 Axure 指定页面的截图
@@ -3178,12 +3097,9 @@
             console.log('开始截取页面:', pageName);
             return new Promise(async (resolve, reject) => {
                 const timeout = setTimeout(() => {
-                    console.warn('截图超时，使用备用方案 fallbackCaptureIframe');
-                    // 超时时用 Promise 包装 fallbackCapture
-                    fallbackCaptureIframe(pageName).then(resolve).catch(err => {
-                        console.error('备用方案也失败:', err);
-                        resolve('');
-                    });
+                    console.warn('截图超时，生成占位图');
+                    clearTimeout(timeout);
+                    resolve(generatePlaceholder(pageName));
                 }, 30000);
                 try {
                     const iframeWin = axureFrame.contentWindow;
@@ -3191,9 +3107,9 @@
                     
                 // 快速检查 iframe 是否可访问
                 if (!iframeWin || !iframeDoc) {
-                    console.warn('无法访问 Axure iframe，使用备用方案 fallbackCapture');
+                    console.warn('无法访问 Axure iframe，生成占位图');
                     clearTimeout(timeout);
-                    fallbackCapture().then(resolve);
+                    resolve(generatePlaceholder(pageName));
                     return;
                 }
                     
@@ -3262,26 +3178,26 @@
                         }
                         console.log('截图：找到 mainFrame, 目标:', pageContent.tagName);
                     } else {
-                        // mainFrame 不可访问（双重 iframe 跨域），直接用 drawImage 截图
-                        console.log('mainFrame 不可访问，直接用 drawImage 截图');
+                        // mainFrame 不可访问，生成占位图
+                        console.log('mainFrame 不可访问，生成占位图');
                         clearTimeout(timeout);
-                        fallbackCaptureIframe(pageName).then(resolve);
+                        resolve(generatePlaceholder(pageName));
                         return;
                     }
-                    
+
                     if (!pageContent || !pageContent.children.length) {
-                        console.log('pageContent 为空或无子元素，直接用 drawImage 截图');
+                        console.log('pageContent 为空或无子元素，生成占位图');
                         clearTimeout(timeout);
-                        fallbackCaptureIframe(pageName).then(resolve);
+                        resolve(generatePlaceholder(pageName));
                         return;
                     }
 
                     console.log('最终 pageContent:', !!pageContent, 'targetDoc:', !!targetDoc, 'targetWin:', !!targetWin);
 
                     if (!pageContent) {
-                        console.error('无法找到页面内容，尝试备用方案');
+                        console.error('无法找到页面内容，生成占位图');
                         clearTimeout(timeout);
-                        fallbackCapture().then(resolve);
+                        resolve(generatePlaceholder(pageName));
                         return;
                     }
                     
@@ -3292,10 +3208,8 @@
                         console.log('正在加载 html-to-image 到 iframe...');
                         console.log('CDN 列表:', 4, '个源');
                         const cdnUrls = [
-                            'https://unpkg.zhimg.com/npm/html-to-image@1.11.11/dist/html-to-image.umd.js',
-                            'https://npmmirror.com/packages/html-to-image/files/1.11.11/dist/html-to-image.umd.js',
-                            'https://cdn.bootcdn.net/ajax/libs/html-to-image/1.11.11/html-to-image.umd.js',
-                            'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.umd.js'
+                            'https://unpkg.com/html-to-image@1.11.11/dist/html-to-image.js',
+                            'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js'
                         ];
                         let lastErr = null;
                         for (let cdnUrl of cdnUrls) {
@@ -3322,9 +3236,9 @@
                             }
                         }
                         if (!targetWin.htmlToImageLoaded) {
-                            console.warn('所有 CDN 都失败，使用备用方案');
+                            console.warn('所有 CDN 都失败，生成占位图');
                             clearTimeout(timeout);
-                            resolve(fallbackCapture());
+                            resolve(generatePlaceholder(pageName, width, height));
                             return;
                         }
                     }
@@ -3408,50 +3322,19 @@
                                 ]);
                                 console.log('截图成功(视口):', pageName, dataUrl.length, 'bytes');
                             } catch(e3) {
-                                console.error('所有截图方案均失败:', e3.message);
-                                console.warn('使用 fallbackCapture() 作为最后备用');
+                                console.error('所有截图方案均失败:', e3.message, '→ 生成占位图');
                                 clearTimeout(timeout);
-                                fallbackCapture().then(resolve);
+                                resolve(generatePlaceholder(pageName, width, height));
                                 return;
                             }
                         }
                     }
                     
                     if (!dataUrl || dataUrl === 'data:,') {
-                        console.warn('html-to-image 返回空，尝试 canvas 直接绘制 iframe');
-                        try {
-                            // 方案D：createImageBitmap（同源 iframe 视口截图）
-                            var vpW2 = axureFrame.clientWidth || 1280;
-                            var vpH2 = axureFrame.clientHeight || 800;
-                            var cvs2 = document.createElement('canvas');
-                            cvs2.width = vpW2;
-                            cvs2.height = vpH2;
-                            var ctx2 = cvs2.getContext('2d');
-                            ctx2.fillStyle = '#ffffff';
-                            ctx2.fillRect(0, 0, vpW2, vpH2);
-                            // 注意：canvas.drawImage(iframe.contentWindow) 始终报错，
-                            // 正确方式：createImageBitmap(window) → ImageBitmap → drawImage(bitmap)
-                            createImageBitmap(axureFrame.contentWindow).then(bitmap2 => {
-                                ctx2.drawImage(bitmap2, 0, 0, vpW2, vpH2);
-                                bitmap2.close();
-                                dataUrl = cvs2.toDataURL('image/png', 0.85);
-                                console.log('截图成功(canvas createImageBitmap):', pageName, dataUrl.length, 'bytes');
-                                clearTimeout(timeout);
-                                resolve(dataUrl);
-                            }).catch(e4 => {
-                                console.error('createImageBitmap 也失败:', e4.message);
-                                console.warn('使用 fallbackCaptureIframe() 作为最后备用');
-                                clearTimeout(timeout);
-                                fallbackCaptureIframe(pageName).then(resolve);
-                            });
-                            return; // 异步处理，不走下面的 resolve
-                        } catch(e4) {
-                            console.error('canvas iframe 也失败:', e4.message);
-                            console.warn('使用 fallbackCaptureIframe() 作为最后备用');
-                            clearTimeout(timeout);
-                            fallbackCaptureIframe(pageName).then(resolve);
-                            return;
-                        }
+                        console.warn('html-to-image 返回空，生成占位图');
+                        clearTimeout(timeout);
+                        resolve(generatePlaceholder(pageName, width, height));
+                        return;
                     }
 
                     clearTimeout(timeout);
