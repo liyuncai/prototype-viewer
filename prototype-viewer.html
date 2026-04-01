@@ -3065,7 +3065,7 @@
                     var ctx = cvs.getContext('2d');
                     ctx.fillStyle = '#f0f0f0';
                     ctx.fillRect(0, 0, vpW, vpH);
-                    try { ctx.drawImage(axureFrame, 0, 0, vpW, vpH); } catch(e) {
+                    try { ctx.drawImage(axureFrame.contentWindow, 0, 0, vpW, vpH); } catch(e) {
                         console.warn('canvas drawImage iframe 失败(跨域?)，尝试获取iframe内部内容');
                         fallbackCaptureIframe().then(resolve);
                         return;
@@ -3115,7 +3115,8 @@
                     ctx.fillRect(0, 0, vpW, vpH);
 
                     try {
-                        ctx.drawImage(targetFrame, 0, 0, vpW, vpH);
+                        // 注意：drawImage 只能接受 contentWindow（不是 iframe 元素本身）
+                        ctx.drawImage(targetFrame.contentWindow, 0, 0, vpW, vpH);
                         const dataUrl = canvas.toDataURL('image/png', 0.8);
                         console.log('drawImage 截图成功:', dataUrl.length, 'bytes');
                         resolve(dataUrl);
@@ -3412,7 +3413,7 @@
                             var ctx2 = cvs2.getContext('2d');
                             ctx2.fillStyle = '#ffffff';
                             ctx2.fillRect(0, 0, vpW2, vpH2);
-                            ctx2.drawImage(axureFrame, 0, 0, vpW2, vpH2);
+                            ctx2.drawImage(axureFrame.contentWindow, 0, 0, vpW2, vpH2);
                             dataUrl = cvs2.toDataURL('image/png', 0.85);
                             console.log('截图成功(canvas iframe):', pageName, dataUrl.length, 'bytes');
                         } catch(e4) {
