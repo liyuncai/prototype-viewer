@@ -3070,7 +3070,7 @@
             }
         }
         
-        // 备用截图方案2：直接用 canvas 绘制 iframe 可见区域
+        // 备用截图方案2：同源 iframe 截图（使用 createImageBitmap）
         function fallbackCapture() {
             console.log('=== 开始 fallbackCapture ===');
             console.log('检查 axureFrame:', typeof axureFrame, !!axureFrame);
@@ -3088,22 +3088,26 @@
                     var ctx = cvs.getContext('2d');
                     ctx.fillStyle = '#f0f0f0';
                     ctx.fillRect(0, 0, vpW, vpH);
-                    try { ctx.drawImage(axureFrame.contentWindow, 0, 0, vpW, vpH); } catch(e) {
-                        console.warn('canvas drawImage iframe 失败(跨域?)，尝试获取iframe内部内容');
+
+                    // 正确方式：用 createImageBitmap 捕获同源 iframe 的可见视口
+                    createImageBitmap(axureFrame.contentWindow).then(bitmap => {
+                        ctx.drawImage(bitmap, 0, 0, vpW, vpH);
+                        bitmap.close();
+                        var dataUrl = cvs.toDataURL('image/png', 0.8);
+                        console.log('fallbackCapture 成功 (createImageBitmap):', dataUrl.length, 'bytes');
+                        resolve(dataUrl);
+                    }).catch(e => {
+                        console.warn('createImageBitmap 失败(跨域或不支持):', e.message, '→ fallbackCaptureIframe');
                         fallbackCaptureIframe().then(resolve);
-                        return;
-                    }
-                    var dataUrl = cvs.toDataURL('image/png', 0.8);
-                    console.log('备用截图成功:', dataUrl.length, 'bytes');
-                    resolve(dataUrl);
+                    });
                 } catch(e) {
-                    console.error('备用截图也失败:', e);
-                    resolve('');
+                    console.error('备用截图异常:', e);
+                    fallbackCaptureIframe().then(resolve);
                 }
             });
         }
 
-        // 备用截图方案3：直接用 canvas drawImage 绘制 mainFrame iframe（同源可用）
+        // 备用截图方案3：同源 iframe 截图（createImageBitmap + 占位图兜底）
         // pageName 可选，用于占位图文字
         function fallbackCaptureIframe(pageName) {
             console.log('=== 开始 fallbackCaptureIframe ===');
@@ -3114,22 +3118,14 @@
                         resolve('');
                         return;
                     }
-                    const iframeDoc = axureFrame.contentDocument;
-                    if (!iframeDoc) {
-                        console.warn('无法访问 iframe contentDocument');
-                        resolve('');
-                        return;
-                    }
 
                     const vpW = axureFrame.clientWidth || 1280;
                     const vpH = axureFrame.clientHeight || 800;
                     console.log('fallbackCaptureIframe 尺寸:', vpW, 'x', vpH);
 
-                    // 尝试方式1：直接 drawImage mainFrame（同源 iframe 可以直接绘制）
-                    const mainFrame = iframeDoc.querySelector('#mainFrame');
-                    const targetFrame = mainFrame || axureFrame;
-                    console.log('目标 frame:', mainFrame ? '#mainFrame' : 'axureFrame');
-
+                    // 尝试 createImageBitmap（同源 iframe 视口截图）
+                    // canvas.drawImage(iframe) 和 canvas.drawImage(iframe.contentWindow) 都不合法！
+                    // 唯一正确方式：createImageBitmap(window) → ImageBitmap → drawImage(bitmap)
                     const canvas = document.createElement('canvas');
                     canvas.width = vpW;
                     canvas.height = vpH;
@@ -3137,33 +3133,30 @@
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(0, 0, vpW, vpH);
 
-                    try {
-                        // 注意：drawImage 只能接受 contentWindow（不是 iframe 元素本身）
-                        ctx.drawImage(targetFrame.contentWindow, 0, 0, vpW, vpH);
+                    createImageBitmap(axureFrame.contentWindow).then(bitmap => {
+                        ctx.drawImage(bitmap, 0, 0, vpW, vpH);
+                        bitmap.close();
                         const dataUrl = canvas.toDataURL('image/png', 0.8);
-                        console.log('drawImage 截图成功:', dataUrl.length, 'bytes');
+                        console.log('fallbackCaptureIframe 成功 (createImageBitmap):', dataUrl.length, 'bytes');
                         resolve(dataUrl);
-                    } catch(drawErr) {
-                        console.warn('drawImage 失败:', drawErr.message, '→ 生成占位图');
+                    }).catch(drawErr => {
+                        console.warn('createImageBitmap 失败:', drawErr.message, '→ 生成占位图');
                         // 生成一个带页面名的灰色占位图
                         ctx.fillStyle = '#e8e8e8';
                         ctx.fillRect(0, 0, vpW, vpH);
-                        // 绘制边框
                         ctx.strokeStyle = '#cccccc';
                         ctx.lineWidth = 2;
                         ctx.strokeRect(10, 10, vpW - 20, vpH - 20);
-                        // 绘制图标
                         ctx.fillStyle = '#aaaaaa';
                         ctx.font = 'bold 48px Arial';
                         ctx.textAlign = 'center';
                         ctx.fillText('🖼', vpW / 2, vpH / 2 - 40);
-                        // 绘制页面名
                         ctx.fillStyle = '#555555';
                         ctx.font = 'bold 20px Arial';
                         ctx.fillText(pageName ? '页面: ' + pageName : '原型页面', vpW / 2, vpH / 2 + 20);
                         ctx.fillStyle = '#888888';
                         ctx.font = '14px Arial';
-                        ctx.fillText('截图预览不可用', vpW / 2, vpH / 2 + 50);
+                        ctx.fillText('截图预览不可用（跨域限制）', vpW / 2, vpH / 2 + 50);
                         try {
                             const placeholderUrl = canvas.toDataURL('image/png', 0.8);
                             console.log('占位图生成成功:', placeholderUrl.length, 'bytes');
@@ -3172,7 +3165,7 @@
                             console.error('占位图也失败:', e2);
                             resolve('');
                         }
-                    }
+                    });
                 } catch(e) {
                     console.error('fallbackCaptureIframe 异常:', e);
                     resolve('');
@@ -3427,7 +3420,7 @@
                     if (!dataUrl || dataUrl === 'data:,') {
                         console.warn('html-to-image 返回空，尝试 canvas 直接绘制 iframe');
                         try {
-                            // 方案D：直接用 canvas 绘制 iframe 可见区域
+                            // 方案D：createImageBitmap（同源 iframe 视口截图）
                             var vpW2 = axureFrame.clientWidth || 1280;
                             var vpH2 = axureFrame.clientHeight || 800;
                             var cvs2 = document.createElement('canvas');
@@ -3436,9 +3429,22 @@
                             var ctx2 = cvs2.getContext('2d');
                             ctx2.fillStyle = '#ffffff';
                             ctx2.fillRect(0, 0, vpW2, vpH2);
-                            ctx2.drawImage(axureFrame.contentWindow, 0, 0, vpW2, vpH2);
-                            dataUrl = cvs2.toDataURL('image/png', 0.85);
-                            console.log('截图成功(canvas iframe):', pageName, dataUrl.length, 'bytes');
+                            // 注意：canvas.drawImage(iframe.contentWindow) 始终报错，
+                            // 正确方式：createImageBitmap(window) → ImageBitmap → drawImage(bitmap)
+                            createImageBitmap(axureFrame.contentWindow).then(bitmap2 => {
+                                ctx2.drawImage(bitmap2, 0, 0, vpW2, vpH2);
+                                bitmap2.close();
+                                dataUrl = cvs2.toDataURL('image/png', 0.85);
+                                console.log('截图成功(canvas createImageBitmap):', pageName, dataUrl.length, 'bytes');
+                                clearTimeout(timeout);
+                                resolve(dataUrl);
+                            }).catch(e4 => {
+                                console.error('createImageBitmap 也失败:', e4.message);
+                                console.warn('使用 fallbackCaptureIframe() 作为最后备用');
+                                clearTimeout(timeout);
+                                fallbackCaptureIframe(pageName).then(resolve);
+                            });
+                            return; // 异步处理，不走下面的 resolve
                         } catch(e4) {
                             console.error('canvas iframe 也失败:', e4.message);
                             console.warn('使用 fallbackCaptureIframe() 作为最后备用');
