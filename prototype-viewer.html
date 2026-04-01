@@ -4709,7 +4709,8 @@ ${JSON.stringify(packageData, null, 2)}
                         console.log('页面:', name, '匹配截图:', matchedShot ? '是' : '否');
                         return {
                             name: name,
-                            thumbnail: matchedShot?.image_data || '', // renderThumbnails 用 thumbnail
+                            thumbnail: matchedShot?.image_data || '', // renderThumbnails 用
+                            screenshot: matchedShot?.image_data || '', // switchToPage 用
                             type: 'cloud'
                         };
                     });
