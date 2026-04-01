@@ -2737,6 +2737,13 @@
             });
             
             thumbnailList.innerHTML = html + addBtn;
+            // 验证 img.src 是否被正确注入
+            const firstImg = thumbnailList.querySelector('img');
+            if (firstImg) {
+                console.log('>>> innerHTML img.src 前80:', firstImg.src.substring(0, 80));
+            } else {
+                console.log('>>> 没有找到img元素，html长度:', html.length);
+            }
         }
 
         // 切换标签页
@@ -4691,9 +4698,6 @@ ${JSON.stringify(packageData, null, 2)}
                     console.error('加载截图失败:', shotErr);
                 } else {
                     console.log('加载到的截图数量:', shots?.length || 0);
-                    shots?.forEach(s => {
-                        console.log('截图:', s.page_name, '数据长度:', s.image_data?.length || 0, '前100字符:', s.image_data?.substring(0, 100));
-                    });
                 }
 
                 // 加载批注
@@ -4706,11 +4710,15 @@ ${JSON.stringify(packageData, null, 2)}
                 if (proj.page_list && proj.page_list.length > 0) {
                     pages = proj.page_list.map(name => {
                         const matchedShot = (shots || []).find(s => s.page_name === name);
-                        console.log('页面:', name, '匹配截图:', matchedShot ? '是' : '否');
+                        const shotData = (matchedShot?.image_data || '').replace(/\s/g, '');
+                        // 将 base64 转为 blob URL（避免 innerHTML 中 base64 字符串过长被浏览器截断）
+                        // 保持原始 base64（data:image/png;base64,...）不变
+                        // 注意：data URL 不受 URL 长度限制，浏览器原生支持
+                        const imgData = shotData || '';
                         return {
                             name: name,
-                            thumbnail: matchedShot?.image_data || '', // renderThumbnails 用
-                            screenshot: matchedShot?.image_data || '', // switchToPage 用
+                            thumbnail: imgData,
+                            screenshot: imgData,
                             type: 'cloud'
                         };
                     });
