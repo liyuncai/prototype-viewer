@@ -8,10 +8,8 @@
         // 动态加载 Supabase（多源备援）
         (function loadSupabase() {
             var cdnUrls = [
-                'https://unpkg.zhimg.com/@supabase/supabase-js@2',
-                'https://npmmirror.com/mirrors/@supabase/supabase-js@2',
-                'https://cdn.bootcdn.net/ajax/libs/@supabase/supabase-js@2.39.8/dist/umd/supabase.js',
-                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+                'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js',
+                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js'
             ];
             var tried = 0;
             function tryNext() {
