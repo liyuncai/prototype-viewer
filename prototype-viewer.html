@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1359,6 +1359,16 @@
         let currentAnnotation = null;
         let nextAnnotationId = 1;
         let annotationMode = false; // 批注模式开关
+
+        // 获取当前页面的批注 key
+        // axure 模式用页面路径名，upload/cloud 模式优先用页面名，否则用数字索引
+        function getCurrentPageKey() {
+            if (currentMode === 'axure') {
+                return axurePagePath || 'default';
+            }
+            const page = pages[currentPageIndex];
+            return (page && page.name) ? page.name : currentPageIndex;
+        }
         let axurePagePath = ''; // Axure 当前页面路径（用于区分不同页面的批注）
 
         // DOM
@@ -1652,7 +1662,7 @@
             console.log('存储坐标（含滚动偏移）:', storedX, storedY);
 
             // 获取当前页面的批注，编号从1开始
-            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const key = getCurrentPageKey();
             const pageAnnotations = annotations[key] || [];
             const id = pageAnnotations.length + 1;
 
@@ -1791,7 +1801,7 @@
             console.log('存储坐标（含滚动偏移）:', storedX, storedY);
 
             // 获取当前页面的批注，编号从1开始
-            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const key = getCurrentPageKey();
             const pageAnnotations = annotations[key] || [];
             const id = pageAnnotations.length + 1;
 
@@ -1975,7 +1985,7 @@
             currentAnnotation.content = content;
             currentAnnotation.author = currentAnnotation.author || localStorage.getItem('pv_lastAuthor') || '匿名';
 
-            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const key = getCurrentPageKey();
             if (!annotations[key]) {
                 annotations[key] = [];
             }
@@ -1989,7 +1999,7 @@
 
             // 云端同步：上传新批注
             pushAnnotationToCloud(
-                currentMode === 'axure' ? key : String(key),
+                String(key),
                 {
                     x: currentAnnotation.x,
                     y: currentAnnotation.y,
@@ -2058,7 +2068,7 @@
             annotationsLayer.innerHTML = '';
 
             // 在 Axure 模式下，使用页面路径作为 key
-            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const key = getCurrentPageKey();
             const arr = annotations[key] || [];
 
             console.log('渲染批注 - 当前页面:', key, '数量:', arr.length, '所有页面:', Object.keys(annotations));
@@ -2372,7 +2382,7 @@
         // 更新批注点位置
         function updateAnnotationPositions(scrollX, scrollY) {
             const dots = annotationsLayer.querySelectorAll('.annotation-dot');
-            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const key = getCurrentPageKey();
             const arr = annotations[key] || [];
 
             dots.forEach((dot, index) => {
@@ -2423,7 +2433,7 @@
 
         // 渲染批注列表
         function renderAnnotationsList() {
-            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const key = getCurrentPageKey();
             const arr = annotations[key] || [];
 
             console.log('渲染批注列表 - 当前页面 key:', key, '批注数量:', arr.length);
@@ -2462,7 +2472,7 @@
 
         // 通过ID编辑批注
         function editAnnotationById(id) {
-            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const key = getCurrentPageKey();
             const arr = annotations[key] || [];
             const annotation = arr.find(a => a.id === id);
             if (annotation) {
@@ -2472,7 +2482,7 @@
 
         // 跳转到批注位置
         function jumpToAnnotation(id) {
-            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const key = getCurrentPageKey();
             const arr = annotations[key] || [];
             const annotation = arr.find(a => a.id === id);
             if (!annotation) return;
@@ -2533,7 +2543,7 @@
         function deleteAnnotationById(event, id) {
             event.stopPropagation(); // 阻止冒泡，避免触发跳转
 
-            const key = currentMode === 'axure' ? (axurePagePath || 'default') : currentPageIndex;
+            const key = getCurrentPageKey();
             const arr = annotations[key] || [];
             const index = arr.findIndex(a => a.id === id);
 
@@ -2632,13 +2642,34 @@
                     img.id = 'canvasImage';
                     canvasContainer.insertBefore(img, annotationsLayer);
                 }
-                img.src = page.image || page.screenshot || '';
-                img.style.display = 'block';
+                const imgSrc = page.image || page.screenshot || null;
+                if (imgSrc) {
+                    img.src = imgSrc;
+                    img.style.display = 'block';
+                } else {
+                    // 无截图：生成占位图
+                    const pw = page.width || 1280, ph = page.height || 800;
+                    const cvs = document.createElement('canvas');
+                    cvs.width = pw; cvs.height = ph;
+                    const ctx2 = cvs.getContext('2d');
+                    ctx2.fillStyle = '#e8e8e8';
+                    ctx2.fillRect(0, 0, pw, ph);
+                    ctx2.strokeStyle = '#cccccc'; ctx2.lineWidth = 2;
+                    ctx2.strokeRect(10, 10, pw - 20, ph - 20);
+                    ctx2.fillStyle = '#aaaaaa'; ctx2.font = 'bold 48px Arial';
+                    ctx2.textAlign = 'center'; ctx2.fillText('🖼', pw / 2, ph / 2 - 40);
+                    ctx2.fillStyle = '#555555'; ctx2.font = 'bold 20px Arial';
+                    ctx2.fillText('页面: ' + (page.name || index), pw / 2, ph / 2 + 20);
+                    ctx2.fillStyle = '#888888'; ctx2.font = '14px Arial';
+                    ctx2.fillText('截图预览不可用', pw / 2, ph / 2 + 50);
+                    img.src = cvs.toDataURL('image/png');
+                    img.style.display = 'block';
+                }
                 axureFrame.style.display = 'none';
                 
                 img.onload = () => {
-                    canvasContainer.style.width = page.width + 'px';
-                    canvasContainer.style.height = page.height + 'px';
+                    canvasContainer.style.width = (page.width || img.naturalWidth || 1280) + 'px';
+                    canvasContainer.style.height = (page.height || img.naturalHeight || 800) + 'px';
                     renderAnnotations();
                 };
             }
@@ -3018,6 +3049,12 @@
         
         // 备用截图方案2：直接用 canvas 绘制 iframe 可见区域
         function fallbackCapture() {
+            console.log('=== 开始 fallbackCapture ===');
+            console.log('检查 axureFrame:', typeof axureFrame, !!axureFrame);
+            if (!axureFrame) {
+                console.error('axureFrame 不存在！');
+                return Promise.resolve('');
+            }
             return new Promise((resolve) => {
                 try {
                     var vpW = axureFrame.clientWidth || 1280;
@@ -3043,112 +3080,148 @@
             });
         }
 
-        // 备用截图方案3：从 iframe 内部截取 DOM（需要同源）
-        function fallbackCaptureIframe() {
-            console.log('开始 iframe 内部截图');
-            try {
-                const iframeDoc = axureFrame.contentDocument;
-                const iframeWin = axureFrame.contentWindow;
-                console.log('iframe 访问:', !!iframeDoc, !!iframeWin);
-                if (!iframeDoc || !iframeWin) {
-                    console.warn('无法访问 iframe 内部文档');
-                    return '';
-                }
-
-                // 找到实际渲染的页面容器
-                let targetContent = null;
-                const mainFrame = iframeDoc.querySelector('#mainFrame');
-                console.log('mainFrame:', !!mainFrame);
-                if (mainFrame && mainFrame.contentDocument) {
-                    const targetDoc = mainFrame.contentDocument;
-                    const base = targetDoc.querySelector('#base');
-                    targetContent = base || targetDoc.body;
-                    console.log('使用 mainFrame 内部内容');
-                } else {
-                    targetContent = iframeDoc.body;
-                    console.log('使用 iframeDoc.body');
-                }
-
-                if (!targetContent) {
-                    console.warn('无法找到页面内容');
-                    return '';
-                }
-                console.log('目标内容元素:', targetContent.tagName, '类名:', targetContent.className);
-
-                // 计算尺寸
-                const rect = targetContent.getBoundingClientRect();
-                const width = Math.max(targetContent.scrollWidth, rect.width, 800);
-                const height = Math.max(targetContent.scrollHeight, rect.height, 600);
-
-                console.log('iframe 内部截图尺寸:', width, 'x', height);
-
-                // 使用 SVG foreignObject 截图
-                const htmlContent = targetContent.outerHTML.substring(0, 50000);
-                console.log('准备创建 SVG，HTML 长度:', htmlContent.length);
-
-                const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '">' +
-                    '<foreignObject width="100%" height="100%">' +
-                    '<div xmlns="http://www.w3.org/1999/xhtml">' +
-                    htmlContent + // 限制长度避免太大
-                    '</div></foreignObject></svg>';
-
-                const svgBlob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-                const svgUrl = URL.createObjectURL(svgBlob);
-                console.log('SVG URL 已创建:', svgUrl.substring(0, 50));
-
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = function() {
-                        console.log('SVG 图片加载成功，开始绘制到 canvas');
-                        const canvas = iframeDoc.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, width, height);
-                        ctx.drawImage(img, 0, 0);
-                        URL.revokeObjectURL(svgUrl);
-                        const dataUrl = canvas.toDataURL('image/png', 0.8);
-                        console.log('iframe 内部截图成功:', dataUrl.length, 'bytes');
-                        resolve(dataUrl);
-                    };
-                    img.onerror = function(e) {
-                        console.error('SVG 转图片失败:', e);
+        // 备用截图方案3：直接用 canvas drawImage 绘制 mainFrame iframe（同源可用）
+        // pageName 可选，用于占位图文字
+        function fallbackCaptureIframe(pageName) {
+            console.log('=== 开始 fallbackCaptureIframe ===');
+            return new Promise((resolve) => {
+                try {
+                    if (!axureFrame) {
+                        console.error('axureFrame 不存在！');
                         resolve('');
-                    };
-                    img.src = svgUrl;
-                });
-            } catch(e) {
-                console.error('iframe 内部截图失败:', e);
-                return Promise.resolve('');
-            }
+                        return;
+                    }
+                    const iframeDoc = axureFrame.contentDocument;
+                    if (!iframeDoc) {
+                        console.warn('无法访问 iframe contentDocument');
+                        resolve('');
+                        return;
+                    }
+
+                    const vpW = axureFrame.clientWidth || 1280;
+                    const vpH = axureFrame.clientHeight || 800;
+                    console.log('fallbackCaptureIframe 尺寸:', vpW, 'x', vpH);
+
+                    // 尝试方式1：直接 drawImage mainFrame（同源 iframe 可以直接绘制）
+                    const mainFrame = iframeDoc.querySelector('#mainFrame');
+                    const targetFrame = mainFrame || axureFrame;
+                    console.log('目标 frame:', mainFrame ? '#mainFrame' : 'axureFrame');
+
+                    const canvas = document.createElement('canvas');
+                    canvas.width = vpW;
+                    canvas.height = vpH;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, vpW, vpH);
+
+                    try {
+                        ctx.drawImage(targetFrame, 0, 0, vpW, vpH);
+                        const dataUrl = canvas.toDataURL('image/png', 0.8);
+                        console.log('drawImage 截图成功:', dataUrl.length, 'bytes');
+                        resolve(dataUrl);
+                    } catch(drawErr) {
+                        console.warn('drawImage 失败:', drawErr.message, '→ 生成占位图');
+                        // 生成一个带页面名的灰色占位图
+                        ctx.fillStyle = '#e8e8e8';
+                        ctx.fillRect(0, 0, vpW, vpH);
+                        // 绘制边框
+                        ctx.strokeStyle = '#cccccc';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(10, 10, vpW - 20, vpH - 20);
+                        // 绘制图标
+                        ctx.fillStyle = '#aaaaaa';
+                        ctx.font = 'bold 48px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('🖼', vpW / 2, vpH / 2 - 40);
+                        // 绘制页面名
+                        ctx.fillStyle = '#555555';
+                        ctx.font = 'bold 20px Arial';
+                        ctx.fillText(pageName ? '页面: ' + pageName : '原型页面', vpW / 2, vpH / 2 + 20);
+                        ctx.fillStyle = '#888888';
+                        ctx.font = '14px Arial';
+                        ctx.fillText('截图预览不可用', vpW / 2, vpH / 2 + 50);
+                        try {
+                            const placeholderUrl = canvas.toDataURL('image/png', 0.8);
+                            console.log('占位图生成成功:', placeholderUrl.length, 'bytes');
+                            resolve(placeholderUrl);
+                        } catch(e2) {
+                            console.error('占位图也失败:', e2);
+                            resolve('');
+                        }
+                    }
+                } catch(e) {
+                    console.error('fallbackCaptureIframe 异常:', e);
+                    resolve('');
+                }
+            });
         }
         
         // 截取 Axure 指定页面的截图
         function captureAxurePage(pageName) {
+            console.log('开始截取页面:', pageName);
             return new Promise(async (resolve, reject) => {
                 const timeout = setTimeout(() => {
-                    console.warn('截图超时，使用备用方案');
+                    console.warn('截图超时，使用备用方案 fallbackCaptureIframe');
                     // 超时时用 Promise 包装 fallbackCapture
-                    fallbackCaptureIframe().then(resolve);
+                    fallbackCaptureIframe(pageName).then(resolve).catch(err => {
+                        console.error('备用方案也失败:', err);
+                        resolve('');
+                    });
                 }, 30000);
                 try {
                     const iframeWin = axureFrame.contentWindow;
                     const iframeDoc = axureFrame.contentDocument;
                     
-                    // 快速检查 iframe 是否可访问
-                    if (!iframeWin || !iframeDoc) {
-                        console.warn('无法访问 Axure iframe，使用备用方案');
-                        clearTimeout(timeout);
-                        resolve(fallbackCapture());
-                        return;
-                    }
+                // 快速检查 iframe 是否可访问
+                if (!iframeWin || !iframeDoc) {
+                    console.warn('无法访问 Axure iframe，使用备用方案 fallbackCapture');
+                    clearTimeout(timeout);
+                    fallbackCapture().then(resolve);
+                    return;
+                }
                     
                     // 切换到目标页面
                     const targetHash = '#id=' + encodeURIComponent(pageName) + '&p=' + encodeURIComponent(pageName);
-                    if (iframeWin.location.hash !== targetHash) {
-                        iframeWin.location.hash = targetHash;
-                        await new Promise((res) => setTimeout(res, 2000));
+                    console.log('当前 hash:', iframeWin.location.hash, '目标 hash:', targetHash);
+                    console.log('页面名:', pageName, '编码后:', encodeURIComponent(pageName));
+
+                    // 先检查 Axure 是否有这个页面
+                    const axurePages = iframeWin.$axure && iframeWin.$axure.document && iframeWin.$axure.document.sitemap;
+                    if (axurePages && axurePages.nodes) {
+                        const pageIds = axurePages.nodes.map(n => n.pageName);
+                        console.log('Axure 可用页面列表:', pageIds);
+                        if (!pageIds.includes(pageName)) {
+                            console.warn('页面不在 Axure 列表中，尝试查找匹配:', pageName);
+                            // 尝试模糊匹配
+                            const matched = pageIds.find(p => p.toLowerCase() === pageName.toLowerCase());
+                            if (matched) {
+                                console.log('找到匹配页面:', matched);
+                                // 使用匹配的页面名重新构建 hash
+                                const matchedHash = '#id=' + encodeURIComponent(matched) + '&p=' + encodeURIComponent(matched);
+                                console.log('使用匹配页面切换:', matched, 'hash:', matchedHash);
+                                iframeWin.location.hash = matchedHash;
+                                await new Promise((res) => setTimeout(res, 2000));
+                            } else {
+                                console.error('找不到匹配的页面，跳过');
+                                clearTimeout(timeout);
+                                resolve('');
+                                return;
+                            }
+                        } else {
+                            if (iframeWin.location.hash !== targetHash) {
+                                console.log('切换到目标页面...');
+                                iframeWin.location.hash = targetHash;
+                                await new Promise((res) => setTimeout(res, 2000));
+                            } else {
+                                console.log('已在目标页面');
+                            }
+                        }
+                    } else {
+                        if (iframeWin.location.hash !== targetHash) {
+                            console.log('无法访问 Axure sitemap，直接切换...');
+                            iframeWin.location.hash = targetHash;
+                            await new Promise((res) => setTimeout(res, 2000));
+                        }
                     }
                     
                     // 找到实际渲染页面的 document
@@ -3157,35 +3230,50 @@
                     let pageContent = null;
                     
                     const mainFrame = iframeDoc.querySelector('#mainFrame');
+                    console.log('查找 mainFrame:', !!mainFrame);
                     if (mainFrame && mainFrame.contentDocument) {
+                        console.log('mainFrame 可访问');
                         targetDoc = mainFrame.contentDocument;
                         targetWin = mainFrame.contentWindow;
                         const base = targetDoc.querySelector('#base');
                         if (base && base.getBoundingClientRect().width > 0) {
                             pageContent = base;
+                            console.log('使用 base 元素');
                         } else {
                             pageContent = targetDoc.body;
+                            console.log('使用 mainFrame.body');
                         }
                         console.log('截图：找到 mainFrame, 目标:', pageContent.tagName);
+                    } else {
+                        // mainFrame 不可访问（双重 iframe 跨域），直接用 drawImage 截图
+                        console.log('mainFrame 不可访问，直接用 drawImage 截图');
+                        clearTimeout(timeout);
+                        fallbackCaptureIframe(pageName).then(resolve);
+                        return;
                     }
                     
                     if (!pageContent || !pageContent.children.length) {
-                        targetDoc = iframeDoc;
-                        targetWin = iframeWin;
-                        pageContent = targetDoc.body;
-                        console.log('截图：使用 iframeDoc body');
-                    }
-                    
-                    if (!pageContent) {
+                        console.log('pageContent 为空或无子元素，直接用 drawImage 截图');
                         clearTimeout(timeout);
-                        reject(new Error('无法找到页面内容'));
+                        fallbackCaptureIframe(pageName).then(resolve);
+                        return;
+                    }
+
+                    console.log('最终 pageContent:', !!pageContent, 'targetDoc:', !!targetDoc, 'targetWin:', !!targetWin);
+
+                    if (!pageContent) {
+                        console.error('无法找到页面内容，尝试备用方案');
+                        clearTimeout(timeout);
+                        fallbackCapture().then(resolve);
                         return;
                     }
                     
                     // 加载 html-to-image 库（注入到 iframe 内部）
                     // 多源尝试：npmmirror（国内镜像）-> bootcdn -> jsdelivr（国外）
+                    console.log('检查是否需要加载 html-to-image，htmlToImageLoaded:', !!targetWin.htmlToImageLoaded);
                     if (!targetWin.htmlToImageLoaded) {
                         console.log('正在加载 html-to-image 到 iframe...');
+                        console.log('CDN 列表:', 4, '个源');
                         const cdnUrls = [
                             'https://unpkg.zhimg.com/npm/html-to-image@1.11.11/dist/html-to-image.umd.js',
                             'https://npmmirror.com/packages/html-to-image/files/1.11.11/dist/html-to-image.umd.js',
@@ -3304,8 +3392,9 @@
                                 console.log('截图成功(视口):', pageName, dataUrl.length, 'bytes');
                             } catch(e3) {
                                 console.error('所有截图方案均失败:', e3.message);
+                                console.warn('使用 fallbackCapture() 作为最后备用');
                                 clearTimeout(timeout);
-                                reject(new Error('截图失败: ' + e3.message));
+                                fallbackCapture().then(resolve);
                                 return;
                             }
                         }
@@ -3327,9 +3416,10 @@
                             dataUrl = cvs2.toDataURL('image/png', 0.85);
                             console.log('截图成功(canvas iframe):', pageName, dataUrl.length, 'bytes');
                         } catch(e4) {
-                            console.error('所有截图方案均失败:', e4.message);
+                            console.error('canvas iframe 也失败:', e4.message);
+                            console.warn('使用 fallbackCaptureIframe() 作为最后备用');
                             clearTimeout(timeout);
-                            resolve('');
+                            fallbackCaptureIframe(pageName).then(resolve);
                             return;
                         }
                     }
@@ -4530,7 +4620,9 @@ ${JSON.stringify(packageData, null, 2)}
                 progressBar.style.width = '20%';
 
                 const pageList = getSelectedSharePages();
+                console.log('getSelectedSharePages 返回:', pageList, '长度:', pageList.length);
                 if (pageList.length === 0) {
+                    console.error('页面列表为空！');
                     throw new Error('没有找到页面');
                 }
 
@@ -4538,6 +4630,11 @@ ${JSON.stringify(packageData, null, 2)}
                 for (let i = 0; i < pageList.length; i++) {
                     progressDesc.textContent = '截取页面 ' + (i + 1) + '/' + pageList.length + '...';
                     progressBar.style.width = (20 + 40 * (i / pageList.length)) + '%';
+                    console.log('开始截图循环:', i, '/', pageList.length, '页面:', pageList[i]);
+
+                    // 给页面切换更多时间
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
                     const shot = await captureAxurePage(pageList[i]);
                     const shotLen = shot ? shot.length : 0;
                     console.log('截图结果:', pageList[i], '长度:', shotLen);
