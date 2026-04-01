@@ -4,7 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>原型查看器 - 连接Axure预览</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // 动态加载 Supabase（多源备援）
+        (function loadSupabase() {
+            var cdnUrls = [
+                'https://unpkg.zhimg.com/@supabase/supabase-js@2',
+                'https://npmmirror.com/mirrors/@supabase/supabase-js@2',
+                'https://cdn.bootcdn.net/ajax/libs/@supabase/supabase-js@2.39.8/dist/umd/supabase.js',
+                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+            ];
+            var tried = 0;
+            function tryNext() {
+                if (tried >= cdnUrls.length) {
+                    console.error('Supabase 所有 CDN 都加载失败');
+                    return;
+                }
+                var url = cdnUrls[tried++];
+                console.log('尝试加载 Supabase CDN:', url);
+                var s = document.createElement('script');
+                s.src = url;
+                s.onload = function() { console.log('Supabase 加载成功:', url); };
+                s.onerror = function() { console.warn('CDN 失败:', url); tryNext(); };
+                document.head.appendChild(s);
+            }
+            tryNext();
+        })();
+    </script>
     <style>
         * {
             margin: 0;
@@ -4553,10 +4578,31 @@ ${JSON.stringify(packageData, null, 2)}
         let cloudSyncEnabled = false;
         let cloudSyncInterval = null;
 
-        function getSB() {
-            if (!sb) {
-                sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let sbReadyPromise = null;
+
+        function waitForSupabase() {
+            if (!sbReadyPromise) {
+                sbReadyPromise = new Promise((resolve, reject) => {
+                    var checkCount = 0;
+                    var interval = setInterval(() => {
+                        checkCount++;
+                        if (typeof window.supabase !== 'undefined') {
+                            clearInterval(interval);
+                            resolve();
+                        } else if (checkCount > 150) { // 150 * 200ms = 30s 超时
+                            clearInterval(interval);
+                            reject(new Error('Supabase SDK 加载超时，请检查网络后刷新重试'));
+                        }
+                    }, 200);
+                });
             }
+            return sbReadyPromise;
+        }
+
+        async function getSB() {
+            if (sb) return sb;
+            await waitForSupabase();
+            sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             return sb;
         }
 
@@ -4614,7 +4660,7 @@ ${JSON.stringify(packageData, null, 2)}
             progressBar.style.width = '10%';
 
             try {
-                const client = getSB();
+                const client = await getSB();
 
                 // 1. 截取页面
                 progressDesc.textContent = '截取页面中...';
@@ -4734,7 +4780,7 @@ ${JSON.stringify(packageData, null, 2)}
         // 从云端加载项目
         async function loadFromCloud(projectId) {
             try {
-                const client = getSB();
+                const client = await getSB();
 
                 // 加载项目信息
                 const { data: proj, error: projErr } = await client
@@ -4856,7 +4902,7 @@ ${JSON.stringify(packageData, null, 2)}
         async function syncFromCloud() {
             if (!cloudProjectId || !cloudSyncEnabled) return;
             try {
-                const client = getSB();
+                const client = await getSB();
                 const { data: annos } = await client
                     .from('annotations')
                     .select('*')
@@ -4908,7 +4954,7 @@ ${JSON.stringify(packageData, null, 2)}
         async function pushAnnotationToCloud(pageName, annoData) {
             if (!cloudProjectId || !cloudSyncEnabled) return;
             try {
-                const client = getSB();
+                const client = await getSB();
                 await client.from('annotations').insert({
                     project_id: cloudProjectId,
                     page_name: pageName,
@@ -4929,7 +4975,7 @@ ${JSON.stringify(packageData, null, 2)}
         async function deleteAnnotationFromCloud(cloudId) {
             if (!cloudProjectId || !cloudSyncEnabled || !cloudId) return;
             try {
-                const client = getSB();
+                const client = await getSB();
                 await client.from('annotations').delete().eq('id', cloudId);
             } catch (err) {
                 console.warn('删除云端批注失败:', err);
@@ -4940,7 +4986,7 @@ ${JSON.stringify(packageData, null, 2)}
         async function updateAnnotationInCloud(cloudId, updates) {
             if (!cloudProjectId || !cloudSyncEnabled || !cloudId) return;
             try {
-                const client = getSB();
+                const client = await getSB();
                 await client.from('annotations').update(updates).eq('id', cloudId);
             } catch (err) {
                 console.warn('更新云端批注失败:', err);
