@@ -1436,6 +1436,16 @@
                 return; // 跳过后续的本地存储加载
             }
 
+            // 如果 URL 含 ?cloud= 参数，跳过 localStorage 加载（云端数据会异步覆盖）
+            const _urlParams = new URLSearchParams(window.location.search);
+            if (_urlParams.get('cloud')) {
+                const savedAxureUrl2 = localStorage.getItem('axureUrl');
+                if (savedAxureUrl2) {
+                    document.getElementById('axureUrl').value = savedAxureUrl2;
+                }
+                return; // 不加载旧 pages，等待 loadFromCloud 填充
+            }
+
             // 从本地存储加载
             loadFromStorage();
             const savedAxureUrl = localStorage.getItem('axureUrl');
@@ -1444,10 +1454,19 @@
             }
         }
 
-        // 保存到本地存储
+        // 保存到本地存储（云端模式下跳过，避免大体积base64撑爆localStorage）
         function saveToStorage() {
-            const data = { pages, annotations, nextAnnotationId, axureUrl };
-            localStorage.setItem('prototypeViewer', JSON.stringify(data));
+            if (currentMode === 'cloud') return; // 云端数据每次从云端加载，不缓存到localStorage
+            // 保存pages时剥离大字段（screenshot/thumbnail/image/html），避免localStorage超限
+            const pagesSlim = pages.map(function(p) {
+                return { name: p.name, type: p.type, width: p.width, height: p.height };
+            });
+            const data = { pages: pagesSlim, annotations, nextAnnotationId, axureUrl };
+            try {
+                localStorage.setItem('prototypeViewer', JSON.stringify(data));
+            } catch(e) {
+                console.warn('saveToStorage 失败（可能超限）:', e);
+            }
         }
 
         // 从本地存储加载
@@ -4750,11 +4769,11 @@ ${JSON.stringify(packageData, null, 2)}
 
                 cloudProjectId = projectId;
                 localStorage.setItem('pv_cloudProjectId', projectId);
-                saveToStorage();
+                // 注意：云端模式不调 saveToStorage，截图数据每次从云端加载
 
-                // 切换到上传模式展示截图
-                currentMode = 'upload';
-                switchMode('upload');
+                // 切换到云端模式展示截图
+                currentMode = 'cloud';
+                switchMode('upload'); // 界面上复用upload面板
 
                 // 显示加载提示
                 if (pages.length > 0) {
